@@ -28,8 +28,8 @@ export function DioramaScene({ palette, pointer, progress }: SceneProps) {
     const t = clock.getElapsedTime();
     g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, -Math.PI / 4 + p.current.x * 0.35 + progress.current * 0.9, 0.05);
     g.rotation.x = THREE.MathUtils.lerp(g.rotation.x, 0.0 + -p.current.y * 0.12, 0.05);
-    g.position.y = -0.6 + Math.sin(t * 0.6) * 0.02 - progress.current * 0.5;
-    g.scale.setScalar(1 + progress.current * 0.25);
+    g.position.y = -1.1 + Math.sin(t * 0.6) * 0.02 - progress.current * 0.5;
+    g.scale.setScalar(0.72 + progress.current * 0.25);
   });
   const wall = palette.surface, floor = palette.muted, prop = palette.fg, accent = palette.accent;
   return (

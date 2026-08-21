@@ -19,7 +19,7 @@ export function WordmarkScene({ palette, pointer, progress, name = 'STUDIO', qua
 
   const geometry = useMemo(() => {
     const font = new FontLoader().parse(fontData as unknown as Parameters<FontLoader['parse']>[0]);
-    const size = Math.min(1.1, 7.2 / Math.max(4, text.length));
+    const size = Math.min(1.0, 5.6 / Math.max(4, text.length));
     const g = new TextGeometry(text, { font, size, depth: size * 0.45, curveSegments: quality === 'preview' ? 6 : 10, bevelEnabled: true, bevelThickness: size * 0.05, bevelSize: size * 0.03, bevelSegments: quality === 'preview' ? 2 : 4 });
     g.center();
     return g;

@@ -17,7 +17,7 @@ function Slabs({ scroll, pointer }: { scroll: React.MutableRefObject<number>; po
   const group = useRef<THREE.Group>(null);
   const refs = useRef<THREE.Mesh[]>([]);
   const { viewport } = useThree();
-  const w = Math.min(viewport.width * 0.46, 6.2);
+  const w = Math.min(viewport.width * 0.38, 5.2);
 
   const slabs = useMemo(() => Array.from({ length: SLABS }, (_, i) => {
     const t = i / (SLABS - 1);
@@ -27,7 +27,7 @@ function Slabs({ scroll, pointer }: { scroll: React.MutableRefObject<number>; po
       // The exploded position: scattered in depth, rotated.
       loose: new THREE.Vector3((Math.sin(i * 2.3) * 0.9) * w * 0.35, (Math.cos(i * 1.7) * 0.8) * w * 0.35, -1.2 - (i % 3) * 1.6 - Math.abs(Math.sin(i)) * 2.2),
       rot: new THREE.Euler(Math.sin(i * 1.3) * 0.55, Math.cos(i * 0.9) * 0.7, Math.sin(i * 0.6) * 0.25),
-      height: 0.26 + (i % 4 === 0 ? 0.5 : i % 3 === 0 ? 0.34 : 0) * w * 0.25,
+      height: 0.16 + (i % 4 === 0 ? 0.5 : i % 3 === 0 ? 0.3 : 0) * w * 0.2,
       accent: i === 0 || i === 4,
       phase: i * 0.9,
     };

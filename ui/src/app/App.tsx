@@ -24,7 +24,7 @@ export function App() {
 
   return (
     <div className="min-h-full flex flex-col">
-      {route.name !== 'project' && <TopBar />}
+      {route.name !== 'project' && route.name !== 'landing' && <TopBar />}
       <main className={cx('flex-1', !fullBleed && 'px-6 md:px-10 lg:px-14 pb-20')}>
         {route.name === 'landing' && <Landing />}
         {route.name === 'setup' && <Setup />}

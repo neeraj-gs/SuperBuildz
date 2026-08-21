@@ -32,24 +32,25 @@ export function Landing() {
   const go = () => navigate(ready ? { name: 'new' } : { name: 'setup' });
 
   return (
-    <div className="-mt-14">
+    <div>
       {/* Hero */}
       <section className="relative h-[100svh] min-h-[640px] overflow-hidden">
         <Suspense fallback={<div className="absolute inset-0 bg-ink" />}>
           <HeroScene className="absolute inset-0" />
         </Suspense>
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/20 to-ink/30 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/10 to-ink/40 pointer-events-none" />
         <div className="relative h-full flex flex-col justify-between px-6 md:px-10 lg:px-14 pt-4 pb-10">
           <div className="h-10 flex items-center justify-between">
             <Logo />
             <div className="flex items-center gap-2">
-              <Button variant="quiet" size="sm" onClick={() => navigate({ name: 'setup' })}>Requirements</Button>
+              <Button variant="quiet" size="sm" onClick={() => navigate({ name: 'setup' })}><span className={cx('w-2 h-2 rounded-full mr-1', ready ? 'bg-volt' : 'bg-bone-4')} />Requirements</Button>
               <Button variant="quiet" size="sm" onClick={() => navigate({ name: 'projects' })}>Projects</Button>
+              <Button variant="primary" size="sm" icon="plus" onClick={go}>New site</Button>
             </div>
           </div>
-          <div className="max-w-[1100px]">
+          <div className="max-w-[1180px]">
             <p className="legend rise mb-5 text-volt">A website generator for people who press things</p>
-            <h1 className="display text-[clamp(3rem,9.4vw,9.6rem)] rise d1">
+            <h1 className="display text-[clamp(2.6rem,6.8vw,7.2rem)] rise d1">
               Press things.<br />Ship something<br /><span className="text-volt">people remember.</span>
             </h1>
             <p className="lede rise d3 mt-7">

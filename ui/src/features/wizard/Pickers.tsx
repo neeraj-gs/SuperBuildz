@@ -77,7 +77,7 @@ export function PickSwatch({ options, value, onChange }: { options: Choice[]; va
             </div>
             <div className="px-3.5 py-2.5 flex items-center justify-between">
               <span><span className="font-semibold text-[14px]">{c.label}</span>{c.blurb && <span className="block text-[12px] text-bone-3">{c.blurb}</span>}</span>
-              <span className="flex gap-1">{(c.swatch ?? []).slice(0, 3).map((s) => <span key={s} className="w-3 h-3 rounded-full border border-line-2" style={{ background: s }} />)}</span>
+              <span className="flex gap-1">{(c.swatch ?? []).slice(0, 3).map((s, i) => <span key={i} className="w-3 h-3 rounded-full border border-line-2" style={{ background: s }} />)}</span>
             </div>
           </button>
         );
