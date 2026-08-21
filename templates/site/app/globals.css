@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/*
+  Tokens arrive as CSS variables from lib/tokens.ts (set on <html>). Tailwind
+  reads them here so utilities like bg-surface and text-accent exist. Change
+  values in design.config.ts, never here.
+*/
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-accent: var(--accent);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+  --radius-sm: var(--radius);
+  --radius-lg: var(--radius-lg);
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+}
+
+html { scroll-behavior: auto; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--body-size);
+  line-height: var(--body-leading);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+::selection { background: var(--accent); color: var(--bg); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.display { font-family: var(--font-display); font-size: var(--display-size); letter-spacing: var(--display-tracking); line-height: var(--display-leading); font-weight: 700; }
+.display-sm { font-family: var(--font-display); letter-spacing: -0.02em; line-height: 1.05; font-weight: 600; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: color-mix(in srgb, var(--fg) 60%, var(--bg)); }
+.measure { max-width: var(--measure); }
+.container-x { padding-left: var(--gutter); padding-right: var(--gutter); }
+.section { padding-top: var(--section); padding-bottom: var(--section); }
+.hairline { border-color: var(--line); }
+
+/* The gesture: rise-and-settle. Reveal.tsx drives these with the tokens. */
+[data-reveal] { opacity: 0; transform: translateY(var(--rise)); transition: opacity var(--base) var(--ease-out), transform var(--base) var(--ease-out); transition-delay: var(--reveal-delay, 0ms); will-change: opacity, transform; }
+[data-reveal="in"] { opacity: 1; transform: none; }
+
+/* Hover system, chosen in design.config.ts → data-hover on <html> */
+[data-hover="lift"] .hover-lift { transition: transform var(--fast) var(--ease-out), box-shadow var(--fast) var(--ease-out); }
+[data-hover="lift"] .hover-lift:hover { transform: translateY(-3px); box-shadow: 0 18px 40px -20px color-mix(in srgb, var(--fg) 35%, transparent); }
+[data-hover="reveal"] .hover-lift { position: relative; overflow: hidden; }
+[data-hover="reveal"] .hover-lift::after { content: ""; position: absolute; inset: 0; background: var(--accent); transform: translateY(101%); transition: transform 350ms var(--ease-out); pointer-events: none; mix-blend-mode: multiply; opacity: .25; }
+[data-hover="reveal"] .hover-lift:hover::after { transform: translateY(0); }
+.link-underline { background-image: linear-gradient(currentColor, currentColor); background-size: 0% 1px; background-repeat: no-repeat; background-position: 0 100%; transition: background-size 350ms var(--ease-out); }
+.link-underline:hover { background-size: 100% 1px; }
+
+/* Cursor: hidden when a custom one is on */
+[data-cursor]:not([data-cursor="system"]) body { cursor: none; }
+[data-cursor]:not([data-cursor="system"]) a, [data-cursor]:not([data-cursor="system"]) button { cursor: none; }
+@media (hover: none) { [data-cursor] body, [data-cursor] a, [data-cursor] button { cursor: auto; } }
+
+/* Page transition: view transitions with a fallback */
+@media (prefers-reduced-motion: no-preference) {
+  [data-transition="fade"] ::view-transition-old(root), [data-transition="fade"] ::view-transition-new(root) { animation-duration: 250ms; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] { opacity: 1; transform: none; transition: none; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Admin inherits everything above; its own few rules live in app/admin/admin.css */

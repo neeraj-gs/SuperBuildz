@@ -87,6 +87,7 @@ test('design.config.ts and fonts.ts are valid-looking TypeScript for every palet
 
 test('password hashes carry their parameters', () => {
   const h = hashPassword('correct horse');
-  assert.match(h, /^scrypt\$32768\$[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+$/);
+  assert.match(h, /^scrypt:32768:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/);
+  assert.ok(!h.includes('$'), 'no $ — Next expands it in .env files');
   assert.notEqual(hashPassword('correct horse'), h);
 });

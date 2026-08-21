@@ -1,0 +1,37 @@
+/*
+  The CRM's own few rules. Everything else — colour, type, radius, motion —
+  comes from the same CSS variables the site uses, which is how the dashboard
+  stays in the site's identity. Denser than the site: a tool, not a poster.
+*/
+.admin { font-size: 14px; line-height: 1.5; }
+.admin-nav { display: block; padding: 6px 10px; border-radius: var(--radius); opacity: .75; transition: background var(--fast), opacity var(--fast); }
+.admin-nav:hover { opacity: 1; background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.admin-nav.is-on { opacity: 1; background: var(--surface); }
+.admin-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+.admin-label { display: grid; gap: 6px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
+.admin-input { height: 40px; padding: 0 12px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--bg); color: var(--fg); font-size: 14px; text-transform: none; letter-spacing: 0; }
+.admin-input:focus { outline: none; border-color: var(--accent); }
+textarea.admin-input { height: auto; padding: 10px 12px; }
+.admin-btn-primary { height: 40px; padding: 0 16px; border-radius: 999px; background: var(--accent); color: var(--bg); font-weight: 600; }
+.admin-btn-primary:disabled { opacity: .6; }
+.admin-btn { height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); font-size: 13px; transition: border-color var(--fast), background var(--fast); }
+.admin-btn:hover { border-color: color-mix(in srgb, var(--fg) 40%, transparent); }
+.admin-kpi { padding: 16px 18px; }
+.admin-kpi .n { font-family: var(--font-display); font-size: 30px; letter-spacing: -0.02em; line-height: 1; margin-top: 8px; }
+.admin-kpi .d { font-family: var(--font-mono); font-size: 12px; margin-top: 8px; opacity: .8; }
+.admin-table { width: 100%; border-collapse: collapse; }
+.admin-table th { text-align: left; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; opacity: .6; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.admin-table td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.admin-table tr:hover td { background: color-mix(in srgb, var(--fg) 3%, transparent); }
+.admin-pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; white-space: nowrap; }
+.admin-pill.is-won { border-color: var(--accent); color: var(--accent); }
+.admin-col { background: color-mix(in srgb, var(--fg) 3%, transparent); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 10px; min-height: 280px; }
+.admin-col.is-over { border-color: var(--accent); }
+.admin-lead-card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px; cursor: grab; transition: transform var(--fast), border-color var(--fast); }
+.admin-lead-card:hover { border-color: color-mix(in srgb, var(--fg) 35%, transparent); transform: translateY(-1px); }
+.admin-lead-card:active { cursor: grabbing; }
+.admin-empty { padding: 48px 24px; text-align: center; opacity: .7; border: 1px dashed var(--line); border-radius: var(--radius-lg); }
+.admin-spark { display: block; width: 100%; height: 36px; }
+.admin-funnel .bar { height: 30px; width: 100%; border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 85%, var(--fg)); transform-origin: left center; transition: transform var(--base) var(--ease-out); }
+.admin-timeline li { position: relative; padding-left: 18px; padding-bottom: 14px; border-left: 1px solid var(--line); margin-left: 6px; }
+.admin-timeline li::before { content: ""; position: absolute; left: -4px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }

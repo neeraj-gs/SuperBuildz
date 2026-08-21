@@ -30,12 +30,16 @@ function copyTree(from: string, to: string) {
   }
 }
 
-/** `scrypt$N$salt$hash`, the same shape templates/site/lib/auth.ts verifies. */
+/**
+ * `scrypt:N:salt:hash`, the same shape templates/site/lib/auth.ts verifies.
+ * Colons, never `$`: Next expands `$VAR` inside .env files, quoted or not,
+ * and a hash full of `$` came out as `scrypt==+q08pEQ=`.
+ */
 export function hashPassword(password: string): string {
   const salt = randomBytes(16);
   const N = 32768;
   const hash = scryptSync(password, salt, 64, { N, r: 8, p: 1, maxmem: 128 * 1024 * 1024 });
-  return `scrypt$${N}$${salt.toString('base64')}$${hash.toString('base64')}`;
+  return `scrypt:${N}:${salt.toString('base64')}:${hash.toString('base64')}`;
 }
 
 function makePassword(): string {
@@ -124,7 +128,7 @@ export const design = {
   },
   layout: ${JSON.stringify(spec.layout)},
   atmosphere: ${JSON.stringify(spec.atmosphere)},
-} as const;
+};
 
 export type Design = typeof design;
 `;

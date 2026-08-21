@@ -16,3 +16,4 @@ templates/site/.env.local
 test-results/
 .playwright-mcp/
 *.tsbuildinfo
+templates/site/components/scenes/
