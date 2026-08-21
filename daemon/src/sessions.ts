@@ -1,0 +1,262 @@
+/**
+ * One conversation with Claude Code about one project.
+ *
+ * A session is a persistent `claude -p` process with stdin open between
+ * turns, so a follow-up reaches something that remembers the last one. The
+ * transcript lives on disk as JSON; the process is incidental and is restarted
+ * with `--resume` if it has gone.
+ *
+ * Every turn: checkpoint first, commit after, so "undo that" is always a
+ * button. Replies are streamed as deltas and finalised from the complete text
+ * blocks; the options block at the end becomes chips.
+ */
+
+import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { splitOptions, type Session, type ToolCall, type Turn } from '@superbuilds/protocol';
+import { startSession, resultError, writeHookSettings, type SessionHandle } from './claude.ts';
+import { checkpointsDir, getSession, saveSession } from './store.ts';
+import { takeSnapshot, restoreSnapshot, pruneSnapshots } from './checkpoints.ts';
+import { broadcast } from './bus.ts';
+import { execPlain } from './binaries.ts';
+import { systemPromptFor } from './brief.ts';
+
+interface Live {
+  handle: SessionHandle;
+  /** The turn currently streaming, if any. */
+  turn?: { id: string; text: string; blocks: string[]; tools: Map<string, ToolCall>; startedAt: number; resolve: (t: Turn) => void; reject: (e: Error) => void };
+  /** A note to prepend to the next user message (after a rewind). */
+  note?: string;
+  projectPath: string;
+  projectName: string;
+}
+
+const live = new Map<string, Live>();
+let hookPort = 0;
+let hookToken = '';
+
+export function configureHooks(port: number, token: string) { hookPort = port; hookToken = token; }
+
+export function createSession(projectId: string, title: string): Session {
+  const s: Session = {
+    id: randomUUID(), projectId, title, createdAt: Date.now(), updatedAt: Date.now(), status: 'idle', turns: [], costUsd: 0,
+  };
+  saveSession(s);
+  broadcast({ type: 'session.upsert', session: s });
+  return s;
+}
+
+export function sessionIsBusy(id: string): boolean {
+  return !!live.get(id)?.turn;
+}
+
+function save(session: Session): Session {
+  const saved = saveSession(session);
+  broadcast({ type: 'session.upsert', session: saved });
+  return saved;
+}
+
+function ensureProcess(session: Session, projectPath: string, projectName: string, opts: { model?: string; budgetUsd?: number; stage?: string }): Live {
+  const existing = live.get(session.id);
+  if (existing && existing.handle.child.exitCode === null) return existing;
+
+  const settingsFile = hookPort ? writeHookSettings(hookPort, hookToken) : undefined;
+  const handle = startSession({
+    cwd: projectPath,
+    sessionId: session.id,
+    resumeSessionId: session.claudeSessionId,
+    systemPrompt: systemPromptFor(projectName, { stage: opts.stage }),
+    model: opts.model,
+    maxBudgetUsd: opts.budgetUsd,
+    permissionMode: 'bypassPermissions',
+    settingsFile,
+    addDirs: [],
+  }, {
+    onInit: (rec) => {
+      const id = String(rec.session_id ?? '');
+      if (id) { const s = getSession(session.id); if (s && s.claudeSessionId !== id) save({ ...s, claudeSessionId: id, model: String(rec.model ?? s.model ?? '') }); }
+    },
+    onTextDelta: (text) => {
+      const l = live.get(session.id); if (!l?.turn) return;
+      l.turn.text += text;
+      broadcast({ type: 'session.delta', sessionId: session.id, turnId: l.turn.id, text });
+    },
+    onThinkingDelta: (text) => {
+      const l = live.get(session.id); if (!l?.turn) return;
+      broadcast({ type: 'session.thinking', sessionId: session.id, turnId: l.turn.id, text });
+    },
+    onAssistantText: (text) => {
+      const l = live.get(session.id); if (!l?.turn) return;
+      l.turn.blocks.push(text);
+    },
+    onToolUse: (call) => {
+      const l = live.get(session.id); if (!l?.turn) return;
+      const tool: ToolCall = { id: call.id, name: call.name, input: call.input, at: Date.now() };
+      l.turn.tools.set(call.id, tool);
+      broadcast({ type: 'session.tool', sessionId: session.id, turnId: l.turn.id, tool });
+    },
+    onToolResult: (res) => {
+      const l = live.get(session.id); if (!l?.turn) return;
+      const tool = l.turn.tools.get(res.id);
+      if (!tool) return;
+      tool.result = res.content.slice(0, 4000);
+      tool.isError = res.isError;
+      broadcast({ type: 'session.tool', sessionId: session.id, turnId: l.turn.id, tool });
+    },
+    onUsage: (used, limit) => {
+      const s = getSession(session.id); if (s) save({ ...s, contextUsed: used, contextLimit: limit });
+    },
+    onResult: (rec) => {
+      const l = live.get(session.id); if (!l?.turn) return;
+      void finishTurn(session.id, rec);
+    },
+    onExit: (code) => {
+      const l = live.get(session.id);
+      if (l?.turn) {
+        const err = new Error(`Claude Code exited (${code}) before finishing the reply.`);
+        const s = getSession(session.id);
+        if (s) {
+          const turn: Turn = { id: l.turn.id, role: 'assistant', text: l.turn.text, at: Date.now(), tools: [...l.turn.tools.values()], error: err.message };
+          save({ ...s, status: 'error', turns: [...s.turns.filter((t) => t.id !== turn.id), turn] });
+          broadcast({ type: 'session.turn', sessionId: session.id, turn });
+        }
+        l.turn.reject(err);
+        l.turn = undefined;
+      }
+      live.delete(session.id);
+    },
+  });
+
+  const entry: Live = { handle, projectPath, projectName };
+  live.set(session.id, entry);
+  return entry;
+}
+
+async function commitAll(projectPath: string, message: string) {
+  if (!existsSync(join(projectPath, '.git'))) return;
+  await execPlain('git', ['-C', projectPath, 'add', '-A'], 60_000);
+  await execPlain('git', ['-C', projectPath, '-c', 'user.name=Super Builds', '-c', 'user.email=superbuilds@localhost', 'commit', '-q', '-m', message.slice(0, 200), '--no-verify'], 60_000);
+}
+
+async function finishTurn(sessionId: string, rec: Record<string, unknown>) {
+  const l = live.get(sessionId);
+  const s = getSession(sessionId);
+  if (!l?.turn || !s) return;
+  const t = l.turn;
+  l.turn = undefined;
+
+  const raw = (t.blocks.length ? t.blocks.join('\n\n') : t.text).trim();
+  const { text, options } = splitOptions(raw);
+  const error = resultError(rec as never);
+  const turn: Turn = {
+    id: t.id, role: 'assistant', text: text || (error ? '' : raw), at: Date.now(),
+    tools: [...t.tools.values()], options, costUsd: Number(rec.total_cost_usd ?? 0), durationMs: Date.now() - t.startedAt,
+    error: error ?? undefined,
+  };
+  const stageOf = s.turns.findLast((x) => x.role === 'user')?.stage;
+  if (stageOf) turn.stage = stageOf;
+
+  const next: Session = {
+    ...s, status: error ? 'error' : 'idle',
+    turns: [...s.turns.filter((x) => x.id !== turn.id), turn],
+    costUsd: (s.costUsd ?? 0) + (turn.costUsd ?? 0),
+  };
+  save(next);
+  broadcast({ type: 'session.turn', sessionId, turn });
+
+  await commitAll(l.projectPath, `Super Builds: ${stageOf ? `stage ${stageOf}` : 'change'} — ${(s.turns.findLast((x) => x.role === 'user')?.text ?? '').split('\n')[0].slice(0, 80)}`);
+  if (error) t.reject(new Error(error)); else t.resolve(turn);
+}
+
+export interface TurnOptions { stage?: string; model?: string; budgetUsd?: number; checkpoint?: boolean; label?: string }
+
+/** Send a message; resolves with the assistant's finished turn. */
+export async function sendTurn(sessionId: string, text: string, projectPath: string, projectName: string, opts: TurnOptions = {}): Promise<Turn> {
+  const s = getSession(sessionId);
+  if (!s) throw new Error('That conversation no longer exists.');
+  if (live.get(sessionId)?.turn) throw new Error('Claude is still replying. Stop it first, or wait.');
+
+  const userTurn: Turn = { id: randomUUID(), role: 'user', text, at: Date.now(), stage: opts.stage };
+  if (opts.checkpoint !== false) {
+    const dir = join(checkpointsDir(sessionId), userTurn.id);
+    const snap = await takeSnapshot(projectPath, dir);
+    if (snap.ok && snap.fileCount >= 0) userTurn.checkpointId = userTurn.id;
+    pruneSnapshots(checkpointsDir(sessionId), 30);
+  }
+
+  const assistantTurn: Turn = { id: randomUUID(), role: 'assistant', text: '', at: Date.now(), partial: true, stage: opts.stage };
+  save({ ...s, status: 'running', turns: [...s.turns, userTurn, assistantTurn] });
+  broadcast({ type: 'session.turn', sessionId, turn: userTurn });
+
+  const l = ensureProcess(s, projectPath, projectName, { model: opts.model, budgetUsd: opts.budgetUsd, stage: opts.stage });
+  const note = l.note; l.note = undefined;
+
+  return new Promise<Turn>((resolve, reject) => {
+    l.turn = { id: assistantTurn.id, text: '', blocks: [], tools: new Map(), startedAt: Date.now(), resolve, reject };
+    l.handle.send(note ? `${note}\n\n${text}` : text);
+  });
+}
+
+export async function stopTurn(sessionId: string): Promise<'stopped' | 'killed' | 'idle'> {
+  const l = live.get(sessionId);
+  if (!l?.turn) return 'idle';
+  const how = await l.handle.interrupt();
+  // The interrupt produces a result record; if it does not, close out here.
+  setTimeout(() => {
+    const still = live.get(sessionId);
+    if (still?.turn) {
+      const s = getSession(sessionId);
+      const turn: Turn = { id: still.turn.id, role: 'assistant', text: still.turn.text, at: Date.now(), tools: [...still.turn.tools.values()], error: 'Stopped.' };
+      if (s) { save({ ...s, status: 'idle', turns: [...s.turns.filter((t) => t.id !== turn.id), turn] }); broadcast({ type: 'session.turn', sessionId, turn }); }
+      still.turn.reject(new Error('Stopped.'));
+      still.turn = undefined;
+    }
+  }, 1500);
+  return how;
+}
+
+/** Put the folder back to before `turnId` (a user turn) and forget what came after. */
+export async function rewindTo(sessionId: string, turnId: string, projectPath: string): Promise<{ ok: boolean; message: string }> {
+  const s = getSession(sessionId);
+  if (!s) return { ok: false, message: 'That conversation no longer exists.' };
+  if (live.get(sessionId)?.turn) return { ok: false, message: 'Claude is still replying. Stop it first.' };
+  const idx = s.turns.findIndex((t) => t.id === turnId);
+  const turn = s.turns[idx];
+  if (idx === -1 || !turn.checkpointId) return { ok: false, message: 'There is no checkpoint for that message.' };
+
+  // Tracked files back to the commit before that turn, then the snapshot on top.
+  await execPlain('git', ['-C', projectPath, 'reset', '-q', '--hard', 'HEAD'], 60_000);
+  const res = await restoreSnapshot(projectPath, join(checkpointsDir(sessionId), turn.checkpointId));
+  if (!res.ok) return res;
+
+  const dropped = s.turns.slice(idx);
+  save({ ...s, turns: s.turns.slice(0, idx), status: 'idle' });
+  const l = live.get(sessionId);
+  const summary = dropped.filter((t) => t.role === 'user').map((t) => `"${t.text.split('\n')[0].slice(0, 80)}"`).join(', ');
+  const note = `[Super Builds] The person pressed Undo. The files have been restored to how they were before ${summary}. Treat everything you did for those messages as not having happened, and do not redo it unless asked.`;
+  if (l) l.note = note; else pendingNotes.set(sessionId, note);
+  await commitAll(projectPath, 'Super Builds: undo');
+  return { ok: true, message: res.message };
+}
+
+const pendingNotes = new Map<string, string>();
+
+/** Called by ensureProcess's caller when a process is (re)started after a rewind. */
+export function takePendingNote(sessionId: string): string | undefined {
+  const n = pendingNotes.get(sessionId);
+  pendingNotes.delete(sessionId);
+  return n;
+}
+
+export function closeSession(sessionId: string) {
+  const l = live.get(sessionId);
+  if (!l) return;
+  l.handle.close();
+  setTimeout(() => l.handle.kill(), 3_000).unref();
+  live.delete(sessionId);
+}
+
+export function closeAll() {
+  for (const id of [...live.keys()]) closeSession(id);
+}

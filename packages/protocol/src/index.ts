@@ -1,0 +1,397 @@
+/**
+ * The contract between the daemon and the interface.
+ *
+ * This file is the only seam. The UI imports nothing from `daemon/src` — it
+ * compiles in development and breaks the browser build the moment `node:fs`
+ * comes along — and the daemon imports nothing from `ui/src`. Prefer adding an
+ * optional field over changing a signature: the dependent count is always
+ * larger than it looks.
+ */
+
+/* ---------------------------------------------------------------------------
+   Claude Code
+--------------------------------------------------------------------------- */
+
+export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions';
+export type Effort = 'low' | 'medium' | 'high' | 'xhigh';
+
+export interface RateLimitInfo {
+  status?: string;
+  resetsAt?: number;
+  rateLimitType?: string;
+  utilization?: number;
+  [k: string]: unknown;
+}
+
+/* ---------------------------------------------------------------------------
+   Requirements
+--------------------------------------------------------------------------- */
+
+export interface DetectionCheck {
+  /** Matches an install recipe id where one exists. */
+  id: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+  /** Why a person should care, in one line. */
+  why: string;
+  /** Not a prerequisite for Super Builds, only for a feature. Reported, never counted. */
+  optional?: boolean;
+  /** What the optional thing unlocks. */
+  unlocks?: string;
+  fixLabel?: string;
+  fixUrl?: string;
+  /** The daemon can run the fix itself: `auth` opens `claude auth login`, otherwise an install id. */
+  fixAction?: 'auth' | 'install';
+}
+
+export interface Detection {
+  ok: boolean;
+  checks: DetectionCheck[];
+  claudeVersion?: string;
+  claudeBin?: string;
+  checkedAt: number;
+  account?: { email?: string; plan?: string };
+  platform: 'windows' | 'mac' | 'linux';
+}
+
+export interface InstallStep { text?: string; command?: string }
+
+export interface InstallRecipeView {
+  id: string;
+  label: string;
+  why: string;
+  docs?: string;
+  steps: Record<'windows' | 'mac' | 'linux', InstallStep[]>;
+  /** What this machine would run. Read-only for the browser. */
+  run: string[];
+  attended?: boolean;
+}
+
+/* ---------------------------------------------------------------------------
+   The catalogue: everything a person can choose
+--------------------------------------------------------------------------- */
+
+export interface Choice {
+  id: string;
+  label: string;
+  /** One line under the label. Says what picking this actually means. */
+  blurb?: string;
+  /** A glyph, where a glyph reads faster than a word. */
+  icon?: string;
+  /** Colours, for choices that are about colour: [background, foreground, accent, ...]. */
+  swatch?: string[];
+  /** Said plainly when an option costs money, needs an account, or phones out. */
+  caveat?: string;
+  /** Environment variable names this choice needs filled in. Never values. */
+  needs?: string[];
+  /** Which archetypes it flatters. Empty or absent means any. */
+  suits?: string[];
+  /** How heavy it is on a phone. */
+  weight?: 'light' | 'medium' | 'heavy';
+  /** Which live preview the UI renders for it. */
+  preview?: string;
+  /** Free-text tags the UI can search. */
+  tags?: string[];
+}
+
+export interface Archetype extends Choice {
+  audience: string;
+  sectors: Choice[];
+  defaults: {
+    goal: string;
+    pages: string[];
+    features: string[];
+    palette: string;
+    typography: string;
+    atmosphere: string;
+    layout: string;
+    scene: string;
+  };
+}
+
+export interface Catalogue {
+  archetypes: Archetype[];
+  goals: Choice[];
+  pages: Choice[];
+  features: Choice[];
+  palettes: Choice[];
+  typography: Choice[];
+  atmospheres: Choice[];
+  layouts: Choice[];
+  scenes: Choice[];
+  motionIntensity: Choice[];
+  scrollStyles: Choice[];
+  hoverStyles: Choice[];
+  cursorStyles: Choice[];
+  transitions: Choice[];
+  themes: Choice[];
+  analytics: Choice[];
+  crm: Choice[];
+  deploy: Choice[];
+}
+
+/** What was extracted from a reference website. */
+export interface DesignDNA {
+  summary: string;
+  palette: string[];
+  typography: { display: string; body: string; scale: string };
+  layout: string;
+  motion: string;
+  threeD: string;
+  hero: string;
+  keep: string[];
+  avoid: string[];
+}
+
+export interface ReferenceCapture {
+  id: string;
+  url: string;
+  status: 'capturing' | 'analysing' | 'done' | 'failed';
+  /** Served paths, e.g. /captures/<id>/shot-0.png */
+  shots: string[];
+  video?: string;
+  dna?: DesignDNA;
+  error?: string;
+  at: number;
+}
+
+/** Facts about the business the person chose to give. All optional. */
+export interface BusinessDetails {
+  tagline?: string;
+  location?: string;
+  phone?: string;
+  email?: string;
+  hours?: string;
+  founded?: string;
+  instagram?: string;
+  website?: string;
+  /** Short lines chosen from suggestions or typed: what they are known for. */
+  knownFor?: string[];
+  /** Services or products, as short labels. */
+  offerings?: string[];
+}
+
+/** Everything the person chose. The whole input to the compiler. */
+export interface Spec {
+  kind: 'website';
+  name: string;
+  folder: string;
+
+  archetype: string;
+  sector?: string;
+  goal: string;
+  pages: string[];
+  features: string[];
+  details: BusinessDetails;
+
+  palette: string;
+  typography: string;
+  atmosphere: string;
+  layout: string;
+  scene: string;
+  motionIntensity: string;
+  scrollStyle: string;
+  hoverStyle: string;
+  cursorStyle: string;
+  transition: string;
+  theme: string;
+
+  analytics: string[];
+  crm: string;
+  deploy: string;
+
+  references: string[];
+  dna?: DesignDNA[];
+  assets: string[];
+  notes?: string;
+  /** Run the award-jury review stage after building. */
+  review: boolean;
+  /** Dollar ceiling passed to Claude Code, when the person set one. */
+  budgetUsd?: number;
+}
+
+/** What the builder will do, shown before it does any of it. */
+export interface Plan {
+  brief: string;
+  stages: Array<{ id: string; label: string; blurb: string }>;
+  secrets: Array<{ key: string; label: string; where: string }>;
+  files: string[];
+  caveats: string[];
+  estimate: { lowUsd: number; highUsd: number; minutes: [number, number]; caveat: string };
+}
+
+/* ---------------------------------------------------------------------------
+   Projects, sessions, turns
+--------------------------------------------------------------------------- */
+
+export type ProjectStatus = 'draft' | 'scaffolding' | 'generating' | 'ready' | 'failed';
+
+export interface Project {
+  id: string;
+  name: string;
+  slug: string;
+  path: string;
+  createdAt: number;
+  updatedAt: number;
+  status: ProjectStatus;
+  spec?: Spec;
+  /** Served path of the latest thumbnail. */
+  thumbnail?: string;
+  deploy?: { url: string; at: number; target: string };
+  sessionId?: string;
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  input: unknown;
+  result?: string;
+  isError?: boolean;
+  at: number;
+}
+
+export interface Turn {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  text: string;
+  at: number;
+  /** The stage this turn belongs to, when generation drove it. */
+  stage?: string;
+  tools?: ToolCall[];
+  /** Next-step chips Claude offered. */
+  options?: string[];
+  /** The checkpoint taken before this turn ran, so it can be undone. */
+  checkpointId?: string;
+  costUsd?: number;
+  durationMs?: number;
+  error?: string;
+  /** Still streaming. */
+  partial?: boolean;
+}
+
+export type SessionStatus = 'idle' | 'running' | 'error';
+
+export interface Session {
+  id: string;
+  projectId: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  status: SessionStatus;
+  claudeSessionId?: string;
+  model?: string;
+  turns: Turn[];
+  costUsd: number;
+  /** Context window used, as reported by the last result. */
+  contextUsed?: number;
+  contextLimit?: number;
+}
+
+export interface Checkpoint {
+  id: string;
+  sessionId: string;
+  turnId: string;
+  at: number;
+  fileCount: number;
+  label: string;
+}
+
+/* ---------------------------------------------------------------------------
+   Generation, preview, deploy
+--------------------------------------------------------------------------- */
+
+export type StageStatus = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
+
+export interface GenerationState {
+  projectId: string;
+  running: boolean;
+  stages: Array<{ id: string; label: string; status: StageStatus; startedAt?: number; endedAt?: number; note?: string }>;
+  /** The scaffold/install log. Claude's own output lives on the session. */
+  log: string;
+  error?: string;
+  startedAt?: number;
+  endedAt?: number;
+  costUsd: number;
+}
+
+export interface PreviewState {
+  projectId: string;
+  running: boolean;
+  url?: string;
+  port?: number;
+  log: string;
+  exitCode?: number;
+  error?: string;
+  startedAt?: number;
+}
+
+export interface DeployState {
+  projectId: string;
+  /** Whether the Vercel CLI is installed. */
+  cli: boolean;
+  /** Whether `vercel whoami` answered with an account. */
+  connected: boolean;
+  account?: string;
+  running: boolean;
+  log: string;
+  url?: string;
+  error?: string;
+  /** Keys in .env.local that will be pushed. Names only. */
+  envKeys: string[];
+}
+
+/* ---------------------------------------------------------------------------
+   Events the daemon pushes over the socket
+--------------------------------------------------------------------------- */
+
+export type ServerEvent =
+  | { type: 'hello'; token: string }
+  | { type: 'detection'; detection: Detection }
+  | { type: 'project.upsert'; project: Project }
+  | { type: 'project.remove'; projectId: string }
+  | { type: 'session.upsert'; session: Session }
+  | { type: 'session.delta'; sessionId: string; turnId: string; text: string }
+  | { type: 'session.thinking'; sessionId: string; turnId: string; text: string }
+  | { type: 'session.tool'; sessionId: string; turnId: string; tool: ToolCall }
+  | { type: 'session.turn'; sessionId: string; turn: Turn }
+  | { type: 'generation.update'; state: GenerationState }
+  | { type: 'preview.update'; state: PreviewState }
+  | { type: 'deploy.update'; state: DeployState }
+  | { type: 'reference.update'; capture: ReferenceCapture }
+  | { type: 'install.update'; message: string };
+
+/* ---------------------------------------------------------------------------
+   Small helpers both sides use
+--------------------------------------------------------------------------- */
+
+/** A folder-safe name from a business name. */
+export function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'site';
+}
+
+/** Options Claude was asked to append, pulled out of its reply. */
+export const OPTIONS_FENCE = 'sb-options';
+
+export function splitOptions(text: string): { text: string; options: string[] } {
+  const rx = new RegExp('```' + OPTIONS_FENCE + '\\s*([\\s\\S]*?)```\\s*$', 'm');
+  const m = text.match(rx);
+  if (!m) return { text: text.trimEnd(), options: [] };
+  let options: string[] = [];
+  try {
+    const parsed = JSON.parse(m[1].trim());
+    if (Array.isArray(parsed)) {
+      options = parsed.map((o) => (typeof o === 'string' ? o : String((o as { label?: string })?.label ?? ''))).filter(Boolean).slice(0, 6);
+    }
+  } catch {
+    // Lines, then. A model that wrote a list rather than JSON still meant options.
+    options = m[1].split('\n').map((l) => l.replace(/^[-*\d.)\s"']+|["']+$/g, '').trim()).filter(Boolean).slice(0, 6);
+  }
+  return { text: text.replace(rx, '').trimEnd(), options };
+}
