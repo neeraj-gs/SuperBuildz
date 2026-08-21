@@ -46,6 +46,14 @@ for (const size of sizes) {
       await page.waitForTimeout(2500);
       const name = (route === '/' ? 'home' : route.replace(/^\//, '').replace(/\//g, '-')) + size.tag + (reduced ? '-reduced' : '');
       await page.screenshot({ path: `shots/${name}.png`, fullPage: false });
+      // Reveal-on-scroll content is invisible until seen: walk the page first, so the
+      // full-page shot shows what a reader would, not blank sections.
+      await page.evaluate(async () => {
+        const h = document.documentElement.scrollHeight; const step = Math.max(200, Math.round(window.innerHeight * 0.6));
+        for (let y = 0; y <= h; y += step) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)); }
+        await new Promise((r) => setTimeout(r, 600));
+        window.scrollTo(0, 0); await new Promise((r) => setTimeout(r, 400));
+      });
       await page.screenshot({ path: `shots/${name}-full.png`, fullPage: true });
       console.log(`shots/${name}.png`);
     } catch (err) { console.error(`${route}: ${err.message.split('\n')[0]}`); }
