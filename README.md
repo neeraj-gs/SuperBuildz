@@ -34,6 +34,8 @@ Verification:
 npm run typecheck
 npm test
 npm run build
+npm run template:install       # once, then: cd templates/site && npx next build
+node scripts/e2e-generate.mjs create   # drives a real build through the running daemon (spends Claude usage)
 ```
 
 ## What is in the box

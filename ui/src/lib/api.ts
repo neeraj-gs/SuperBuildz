@@ -12,9 +12,11 @@ let token = '';
 export function setToken(t: string) { token = t; }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  // No content-type without a body: Fastify answers 400 to an empty JSON body,
+  // which turned every bodiless POST (start preview, stop, sign in) into a failure.
   const res = await fetch(path, {
     method,
-    headers: { 'content-type': 'application/json', ...(token ? { 'x-superbuilds-token': token } : {}) },
+    headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...(token ? { 'x-superbuilds-token': token } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await res.text();

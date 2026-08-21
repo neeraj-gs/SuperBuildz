@@ -255,7 +255,8 @@ export async function rewindTo(sessionId: string, turnId: string, projectPath: s
   const note = `[Super Builds] The person pressed Undo. The files have been restored to how they were before ${summary}. Treat everything you did for those messages as not having happened, and do not redo it unless asked.`;
   if (l) l.note = note; else pendingNotes.set(sessionId, note);
   await commitAll(projectPath, 'Super Builds: undo');
-  return { ok: true, message: res.message };
+  const n = dropped.filter((t) => t.role === 'assistant').length;
+  return { ok: true, message: `Undone: ${n} change${n === 1 ? '' : 's'} reverted, the site is as it was before that message. ${res.restored ? res.message : ''}`.trim() };
 }
 
 const pendingNotes = new Map<string, string>();

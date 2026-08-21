@@ -175,7 +175,31 @@ project, no secrets in prompts); generated sites ship CSP, strict headers, CSRF
 on admin mutations, zod validation, IP rate limiting, scrypt credentials,
 HttpOnly cookies, parameterised queries only, and no secret in client code.
 
-## 11. What is explicitly not in v1
+## 11. What a real build looked like (calibration, 2026-08-21)
+
+A restaurant (fine dining, Lisbon), diorama scene, Ember palette, big display
+serif, stacked-cards layout, four pages, booking + gallery + map + hours,
+built-in CRM + Vercel Analytics, review stage off:
+
+| Stage | Time | Tool calls | Usage (API-equivalent) |
+| --- | --- | --- | --- |
+| scaffold (template + npm install) | 0.5 min | — | — |
+| identity and hero | 17 min | 57 | ~$6 |
+| pages and content | 15 min | 50 | ~$8 |
+| motion system | 13 min | 34 | ~$7 |
+| CRM and analytics | 12 min | 35 | ~$8 |
+| one follow-up change in chat | 1 min | 4 | ~$1 |
+
+Three things learned and fixed the same day: Claude Code's `total_cost_usd`
+is cumulative per process (the daemon now reports deltas); `.env.local` is
+`$`-expanded by Next so hashes are colon-separated; reveal-on-scroll content is
+invisible to a naive full-page screenshot, so `shot.mjs` walks the page first.
+The hero it produced — the diorama rebuilt as a hearth with rising embers and
+the initials on the wall, "Fire, slowly." across it — cleared the hero rule
+without anyone typing a sentence of design direction. Undo of the follow-up
+change restored the previous commit.
+
+## 12. What is explicitly not in v1
 
 Electron packaging (the daemon and UI are shaped for it; the shell comes next),
 Codex/Gemini runtimes (the `Runtime` seam exists; only Claude is implemented),
