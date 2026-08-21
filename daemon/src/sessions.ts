@@ -12,7 +12,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { splitOptions, type Session, type ToolCall, type Turn } from '@superbuilds/protocol';
 import { startSession, resultError, writeHookSettings, type SessionHandle } from './claude.ts';
@@ -24,6 +24,13 @@ import { systemPromptFor } from './brief.ts';
 
 interface Live {
   handle: SessionHandle;
+  /**
+   * `total_cost_usd` on a result record is cumulative for the process, not
+   * per turn — observed on a real build: 5.93, 13.78, 20.90, 29.25 across four
+   * stages, then 30.37 for a one-minute follow-up. Summing those would report
+   * $70 for a $30 build. So a turn's cost is the delta from the last result.
+   */
+  costBase: number;
   /** The turn currently streaming, if any. */
   turn?: { id: string; text: string; blocks: string[]; tools: Map<string, ToolCall>; startedAt: number; resolve: (t: Turn) => void; reject: (e: Error) => void };
   /** A note to prepend to the next user message (after a rewind). */
@@ -128,7 +135,7 @@ function ensureProcess(session: Session, projectPath: string, projectName: strin
     },
   });
 
-  const entry: Live = { handle, projectPath, projectName };
+  const entry: Live = { handle, projectPath, projectName, costBase: 0 };
   live.set(session.id, entry);
   return entry;
 }
@@ -149,9 +156,12 @@ async function finishTurn(sessionId: string, rec: Record<string, unknown>) {
   const raw = (t.blocks.length ? t.blocks.join('\n\n') : t.text).trim();
   const { text, options } = splitOptions(raw);
   const error = resultError(rec as never);
+  const cumulative = Number(rec.total_cost_usd ?? 0);
+  const turnCost = Math.max(0, cumulative - l.costBase);
+  l.costBase = cumulative;
   const turn: Turn = {
     id: t.id, role: 'assistant', text: text || (error ? '' : raw), at: Date.now(),
-    tools: [...t.tools.values()], options, costUsd: Number(rec.total_cost_usd ?? 0), durationMs: Date.now() - t.startedAt,
+    tools: [...t.tools.values()], options, costUsd: turnCost, durationMs: Date.now() - t.startedAt,
     error: error ?? undefined,
   };
   const stageOf = s.turns.findLast((x) => x.role === 'user')?.stage;
@@ -225,9 +235,17 @@ export async function rewindTo(sessionId: string, turnId: string, projectPath: s
   const turn = s.turns[idx];
   if (idx === -1 || !turn.checkpointId) return { ok: false, message: 'There is no checkpoint for that message.' };
 
-  // Tracked files back to the commit before that turn, then the snapshot on top.
-  await execPlain('git', ['-C', projectPath, 'reset', '-q', '--hard', 'HEAD'], 60_000);
-  const res = await restoreSnapshot(projectPath, join(checkpointsDir(sessionId), turn.checkpointId));
+  /*
+    Every turn commits when it finishes, so the snapshot taken before a turn is
+    usually empty (the tree was clean) and the change to undo is a commit. The
+    manifest recorded HEAD at snapshot time; reset to that, then lay the
+    snapshot's copies (pre-existing uncommitted work) back on top.
+  */
+  const snapDir = join(checkpointsDir(sessionId), turn.checkpointId);
+  let head = 'HEAD';
+  try { head = (JSON.parse(readFileSync(join(snapDir, 'manifest.json'), 'utf8')) as { head?: string }).head || 'HEAD'; } catch { /* fall back to HEAD */ }
+  await execPlain('git', ['-C', projectPath, 'reset', '-q', '--hard', head], 60_000);
+  const res = await restoreSnapshot(projectPath, snapDir);
   if (!res.ok) return res;
 
   const dropped = s.turns.slice(idx);

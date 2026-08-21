@@ -493,13 +493,13 @@ export function planFor(spec: Spec): Plan {
   const stages = stagesFor(spec).map((s) => ({ id: s.id, label: s.label, blurb: s.blurb }));
   /*
     Calibrated on a real four-stage build (restaurant, diorama, four pages):
-    57 minutes and about $70 of API-equivalent usage across 176 tool calls.
-    Stages cost more as they go — the CRM stage alone was $29 — so the range
-    is wide on purpose and says so.
+    57 minutes, 176 tool calls, about $30 of API-equivalent usage (the CLI's
+    total_cost_usd is cumulative; the stages were roughly 6 / 8 / 7 / 8). The
+    range is wide on purpose and says so.
   */
   const pagesN = spec.pages.length;
-  const low = 12 + pagesN * 4 + (spec.review ? 15 : 0) + (scene.weight === 'heavy' ? 10 : scene.weight === 'medium' ? 5 : 0);
-  const high = low * 2.4;
+  const low = 8 + pagesN * 2.5 + (spec.review ? 8 : 0) + (scene.weight === 'heavy' ? 5 : scene.weight === 'medium' ? 3 : 0);
+  const high = low * 2.2;
 
   return {
     brief: masterBrief(spec),

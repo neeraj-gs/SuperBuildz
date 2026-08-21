@@ -30,6 +30,14 @@ if (mode === 'capture-state') {
   console.log(JSON.stringify({ status: c.status, shots: c.shots.length, video: c.video, error: c.error, dna: c.dna }, null, 2));
   ws.close(); process.exit(0);
 }
+if (mode === 'rewind') {
+  const p = await get(`/api/projects/${process.argv[3]}`);
+  const s = await get(`/api/sessions/${p.sessionId}`);
+  const lastUser = [...s.turns].reverse().find((t) => t.role === 'user' && t.checkpointId);
+  console.log('rewinding to before:', lastUser?.text.slice(0, 80));
+  console.log(await post(`/api/sessions/${s.id}/rewind`, { turnId: lastUser.id }));
+  ws.close(); process.exit(0);
+}
 if (mode === 'watch') {
   const id = process.argv[3];
   const g = await get(`/api/projects/${id}/generation`);
