@@ -143,12 +143,26 @@ function radiusFor(atmos: string) { return ['calm', 'warm-direct', 'appetite'].i
 function radiusLgFor(atmos: string) { return ['calm', 'warm-direct', 'appetite'].includes(atmos) ? '28px' : ['technical', 'futurist', 'plain-confident', 'bold-editorial'].includes(atmos) ? '4px' : '16px'; }
 
 /** `app/fonts.ts` — next/font/google needs static imports, so they are written per project. */
+/**
+ * Fonts on Google Fonts that are not variable need explicit weights, or
+ * next/font fails the build with "Missing weight". Everything else here is a
+ * variable face and takes the whole axis.
+ */
+const STATIC_WEIGHTS: Record<string, string[]> = {
+  'Instrument Serif': ['400'],
+  'Barlow': ['400', '500', '600', '700'],
+  'Barlow Condensed': ['500', '600', '700', '800'],
+};
+
 export function fontsSource(spec: Spec): string {
   const type = TYPE_DIRECTION[spec.typography] ?? TYPE_DIRECTION.grotesk;
   const ident = (name: string) => name.replace(/[^A-Za-z0-9]/g, '_');
   const faces = [...new Set([type.display, type.body, type.mono ?? 'JetBrains Mono'])];
   const imports = faces.map(ident).join(', ');
-  const decls = faces.map((f) => `const ${ident(f).toLowerCase()}Font = ${ident(f)}({ subsets: ['latin'], display: 'swap', variable: '--font-${ident(f).toLowerCase()}' });`).join('\n');
+  const decls = faces.map((f) => {
+    const weights = STATIC_WEIGHTS[f] ? `, weight: ${JSON.stringify(STATIC_WEIGHTS[f])}` : '';
+    return `const ${ident(f).toLowerCase()}Font = ${ident(f)}({ subsets: ['latin'], display: 'swap', variable: '--font-${ident(f).toLowerCase()}'${weights} });`;
+  }).join('\n');
   return `/** Written by Super Builds for the chosen typography. Fonts load at build time through next/font. */
 import { ${imports} } from 'next/font/google';
 

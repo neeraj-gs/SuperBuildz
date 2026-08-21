@@ -81,6 +81,9 @@ test('design.config.ts and fonts.ts are valid-looking TypeScript for every palet
       const fonts = fontsSource(spec);
       assert.match(fonts, /from 'next\/font\/google'/);
       assert.match(fonts, /export const fontVariables/);
+      // Static Google faces must carry weights or next/font fails the build.
+      if (t.id === 'display-serif') assert.match(fonts, /Instrument_Serif\(\{[^}]*weight: \["400"\]/);
+      if (t.id === 'condensed') assert.match(fonts, /Barlow_Condensed\(\{[^}]*weight: \[/);
     }
   }
 });

@@ -10,6 +10,7 @@ import { useStore, navigate, toast } from '@/lib/store';
 import { api } from '@/lib/api';
 import { Button, Spinner, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
+import { Chat } from '@/features/workspace/Chat';
 import type { InstallRecipeView } from '@superbuilds/protocol';
 
 export function Setup() {
@@ -37,11 +38,15 @@ export function Setup() {
   const required = detection?.checks.filter((c) => !c.optional) ?? [];
   const optional = detection?.checks.filter((c) => c.optional) ?? [];
 
+  const [machineSession, setMachineSession] = useState<string | null>(null);
+  const sessions = useStore((s) => s.sessions);
   const letClaude = async () => {
     if (!missing.length) return;
     try {
       const r = await api.provision([...new Set(missing)]);
-      toast(r.busy ? 'Claude is already working on it.' : 'Claude Code is setting up this machine. Watch the terminal it opens; press Check again when it reports done.', 'ok');
+      setMachineSession(r.sessionId);
+      await useStore.getState().loadSession(r.sessionId);
+      toast(r.busy ? 'Claude is already working on it.' : 'Claude Code is setting up this machine. Follow along below; press Check again when it reports done.', 'ok');
     } catch (e) { toast((e as Error).message, 'error'); }
   };
 
@@ -64,6 +69,12 @@ export function Setup() {
           <Summary ok={detection.ok} account={detection.account} missing={missing.length} onClaude={letClaude} />
           <Group title="Needed to build" rows={required} acting={acting} fix={fix} plan={plan} open={open} setOpen={setOpen} />
           <Group title="Optional — unlocks more" rows={optional} acting={acting} fix={fix} plan={plan} open={open} setOpen={setOpen} />
+          {machineSession && sessions[machineSession] && (
+            <section className="mt-10">
+              <p className="legend mb-3">Claude, setting up this machine</p>
+              <div className="panel h-[480px] flex flex-col overflow-hidden"><Chat session={sessions[machineSession]} projectId="machine" busy={false} /></div>
+            </section>
+          )}
           <p className="telemetry text-bone-3 mt-8">Platform: {detection.platform} · Claude Code {detection.claudeVersion ?? '—'} at {detection.claudeBin}</p>
         </>
       )}
