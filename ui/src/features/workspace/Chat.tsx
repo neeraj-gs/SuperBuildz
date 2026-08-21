@@ -89,8 +89,7 @@ export function Chat({ session, projectId, busy }: { session: Session; projectId
           <span>{running ? <span className="inline-flex items-center gap-1.5 text-volt"><Spinner size={10} /> Claude is working</span> : session.model ? `model ${session.model}` : 'ready'}</span>
           <span className="flex items-center gap-3">
             <button onClick={() => setShowThinking(!showThinking)} className={cx(showThinking && 'text-volt')}>thinking</button>
-            {session.contextUsed && session.contextLimit ? <span>{Math.round((session.contextUsed / session.contextLimit) * 100)}% context</span> : null}
-            <span>${session.costUsd.toFixed(2)}</span>
+            <span title="API-equivalent usage; on a subscription this is usage, not a bill">${session.costUsd.toFixed(2)}</span>
           </span>
         </div>
       </div>

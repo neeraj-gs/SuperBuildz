@@ -18,17 +18,17 @@ if (mode === 'create') {
   console.log('project', project.id, project.path);
   const gen = await post(`/api/projects/${project.id}/generate`);
   console.log('generation started', gen.stages.map((s) => s.id).join(' → '));
-  process.exit(0);
+  ws.close(); process.exit(0);
 }
 if (mode === 'capture') {
   const cap = await post('/api/reference', { url: process.argv[3] });
   console.log('capture', cap.id, cap.status);
-  process.exit(0);
+  ws.close(); process.exit(0);
 }
 if (mode === 'capture-state') {
   const c = await get(`/api/reference/${process.argv[3]}`);
   console.log(JSON.stringify({ status: c.status, shots: c.shots.length, video: c.video, error: c.error, dna: c.dna }, null, 2));
-  process.exit(0);
+  ws.close(); process.exit(0);
 }
 if (mode === 'watch') {
   const id = process.argv[3];
@@ -37,5 +37,5 @@ if (mode === 'watch') {
   const pv = await get(`/api/projects/${id}/preview`);
   console.log(JSON.stringify({ status: p.status, running: g?.running, error: g?.error, cost: g?.costUsd, stages: g?.stages.map((s) => `${s.id}:${s.status}`), preview: pv.url, logTail: g?.log.slice(-300) }, null, 2));
   if (p.sessionId) { const s = await get(`/api/sessions/${p.sessionId}`); const last = s.turns.at(-1); console.log('turns', s.turns.length, 'last', last?.role, (last?.text ?? '').slice(0, 600), 'tools', last?.tools?.length, 'options', last?.options); }
-  process.exit(0);
+  ws.close(); process.exit(0);
 }

@@ -491,9 +491,15 @@ export function planFor(spec: Spec): Plan {
   if (scene.weight === 'heavy') caveats.push(`${scene.label} is the heaviest kind of scene; the build will render it at lower resolution on phones.`);
 
   const stages = stagesFor(spec).map((s) => ({ id: s.id, label: s.label, blurb: s.blurb }));
+  /*
+    Calibrated on a real four-stage build (restaurant, diorama, four pages):
+    57 minutes and about $70 of API-equivalent usage across 176 tool calls.
+    Stages cost more as they go — the CRM stage alone was $29 — so the range
+    is wide on purpose and says so.
+  */
   const pagesN = spec.pages.length;
-  const low = 3 + pagesN * 0.6 + (spec.review ? 2 : 0) + (scene.weight === 'heavy' ? 2 : scene.weight === 'medium' ? 1 : 0);
-  const high = low * 2.2;
+  const low = 12 + pagesN * 4 + (spec.review ? 15 : 0) + (scene.weight === 'heavy' ? 10 : scene.weight === 'medium' ? 5 : 0);
+  const high = low * 2.4;
 
   return {
     brief: masterBrief(spec),
@@ -503,8 +509,8 @@ export function planFor(spec: Spec): Plan {
     caveats,
     estimate: {
       lowUsd: Math.round(low), highUsd: Math.round(high),
-      minutes: [12 + pagesN * 2, 30 + pagesN * 4],
-      caveat: 'A range, not a quote. It runs on your Claude plan; a subscription shows it as usage rather than dollars.',
+      minutes: [25 + pagesN * 4 + (spec.review ? 10 : 0), 45 + pagesN * 8 + (spec.review ? 15 : 0)],
+      caveat: 'A range, not a quote, and it is API-equivalent — on a Claude subscription it shows as usage, not a bill. A real four-page build took about an hour.',
     },
   };
 }
