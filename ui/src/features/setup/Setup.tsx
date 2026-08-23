@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import { useStore, navigate, toast } from '@/lib/store';
 import { api } from '@/lib/api';
-import { Button, Spinner, cx } from '@/components/ui';
+import { Button, Index, Spinner, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { Chat } from '@/features/workspace/Chat';
 import type { InstallRecipeView } from '@superbuilds/protocol';
@@ -51,18 +51,18 @@ export function Setup() {
   };
 
   return (
-    <div className="max-w-[980px] mx-auto pt-10">
-      <p className="legend mb-3">Requirements</p>
+    <div className="shell pt-12">
+      <Index n={1} className="mb-8">Requirements</Index>
       <div className="flex flex-wrap items-end justify-between gap-6">
-        <h1 className="display text-[clamp(2.2rem,5vw,4.4rem)] max-w-[14ch]">What this machine needs, and what it has.</h1>
+        <h1 className="d2 max-w-[18ch]">What this machine needs, and <span className="serif">what it has.</span></h1>
         <div className="flex items-center gap-2">
           <Button icon="refresh" onClick={recheck} busy={busy}>Check again</Button>
           {detection?.ok && <Button variant="primary" iconRight="arrowRight" onClick={() => navigate({ name: 'new' })}>Build a site</Button>}
         </div>
       </div>
-      <p className="lede mt-5">Super Builds runs your own Claude Code and publishes with your own Vercel login. It checks by asking each tool about itself; it never reads a credentials file.</p>
+      <p className="copy mt-4">Super Builds runs your own Claude Code and publishes with your own Vercel login. It checks by asking each tool about itself; it never reads a credentials file.</p>
 
-      {!detection && <div className="panel p-10 mt-10 flex items-center gap-3 text-bone-2"><Spinner /> Asking each tool about itself…</div>}
+      {!detection && <div className="panel p-10 mt-8 flex items-center gap-3 text-bone-2"><Spinner /> Asking each tool about itself…</div>}
 
       {detection && (
         <>
@@ -71,11 +71,11 @@ export function Setup() {
           <Group title="Optional — unlocks more" rows={optional} acting={acting} fix={fix} plan={plan} open={open} setOpen={setOpen} />
           {machineSession && sessions[machineSession] && (
             <section className="mt-10">
-              <p className="legend mb-3">Claude, setting up this machine</p>
-              <div className="panel h-[480px] flex flex-col overflow-hidden"><Chat session={sessions[machineSession]} projectId="machine" busy={false} /></div>
+              <Index className="mb-4">Claude, setting up this machine</Index>
+              <div className="panel h-[460px] flex flex-col overflow-hidden"><Chat session={sessions[machineSession]} projectId="machine" busy={false} /></div>
             </section>
           )}
-          <p className="telemetry text-bone-3 mt-8">Platform: {detection.platform} · Claude Code {detection.claudeVersion ?? '—'} at {detection.claudeBin}</p>
+          <p className="telemetry text-bone-4 mt-10 pt-6 border-t border-line">Platform: {detection.platform} · Claude Code {detection.claudeVersion ?? '—'} at {detection.claudeBin}</p>
         </>
       )}
     </div>
@@ -84,12 +84,12 @@ export function Setup() {
 
 function Summary({ ok, account, missing, onClaude }: { ok: boolean; account?: { email?: string; plan?: string }; missing: number; onClaude: () => void }) {
   return (
-    <div className={cx('panel mt-10 p-6 flex flex-wrap items-center justify-between gap-4', ok ? 'border-volt/40' : 'border-danger/40')}>
+    <div className={cx('panel mt-8 p-5 flex flex-wrap items-center justify-between gap-4', ok ? 'border-volt-3' : 'border-danger/40')}>
       <div className="flex items-center gap-4">
-        <span className={cx('grid place-items-center w-11 h-11 rounded-full', ok ? 'bg-volt text-ink' : 'bg-danger/15 text-danger')}><Icon name={ok ? 'check' : 'alert'} size={20} /></span>
+        <span className={cx('grid place-items-center w-10 h-10 rounded-full shrink-0', ok ? 'bg-volt text-[color:var(--color-volt-ink)]' : 'bg-danger/15 text-danger')}><Icon name={ok ? 'check' : 'alert'} size={18} /></span>
         <div>
-          <div className="font-semibold text-[16px]">{ok ? 'Ready to build.' : 'Something is missing.'}</div>
-          <div className="text-bone-3 text-[13.5px]">{ok ? (account?.email ? `Signed in as ${account.email}${account.plan ? ` · ${account.plan}` : ''}` : 'Everything needed is here.') : 'Each row below says what and offers a button.'}</div>
+          <div className="d4">{ok ? 'Ready to build.' : 'Something is missing.'}</div>
+          <div className="text-bone-3 text-[13px] mt-0.5">{ok ? (account?.email ? `Signed in as ${account.email}${account.plan ? ` · ${account.plan}` : ''}` : 'Everything needed is here.') : 'Each row below says what and offers a button.'}</div>
         </div>
       </div>
       {!ok && missing > 0 && <Button icon="sparkle" onClick={onClaude}>Let Claude sort it out</Button>}
@@ -101,26 +101,26 @@ function Group({ title, rows, acting, fix, plan, open, setOpen }: { title: strin
   if (!rows.length) return null;
   return (
     <section className="mt-10">
-      <p className="legend mb-3">{title}</p>
+      <Index className="mb-4">{title}</Index>
       <div className="panel divide-y divide-line overflow-hidden">
         {rows.map((c) => {
           const recipe = plan?.recipes.find((r) => r.id === (c.id === 'version' ? 'claude' : c.id));
           const isOpen = open === c.id;
           return (
             <div key={c.id}>
-              <div className="flex items-center gap-4 px-5 py-4">
-                <span className={cx('w-2.5 h-2.5 rounded-full shrink-0', c.ok ? 'bg-volt' : c.optional ? 'bg-bone-4' : 'bg-danger')} />
+              <div className="flex items-center gap-4 px-4 py-3.5">
+                <span className={cx('w-1.5 h-1.5 rounded-full shrink-0', c.ok ? 'bg-volt' : c.optional ? 'bg-bone-4' : 'bg-danger')} />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap"><span className="font-semibold">{c.label}</span>{c.optional && c.unlocks && <span className="telemetry text-bone-3">unlocks {c.unlocks.toLowerCase()}</span>}</div>
-                  <div className="text-[13px] text-bone-3 truncate">{c.detail}</div>
-                  <div className="text-[12.5px] text-bone-4 mt-0.5">{c.why}</div>
+                  <div className="flex items-center gap-2 flex-wrap"><span className="font-semibold text-[13.5px]">{c.label}</span>{c.optional && c.unlocks && <span className="telemetry text-bone-3">unlocks {c.unlocks.toLowerCase()}</span>}</div>
+                  <div className="telemetry text-bone-3 truncate mt-0.5">{c.detail}</div>
+                  <div className="text-[12.5px] text-bone-4 mt-1 measure">{c.why}</div>
                 </div>
                 {!c.ok && c.fixAction && <Button size="sm" variant={c.optional ? 'ghost' : 'primary'} busy={acting === c.id} onClick={() => fix(c.id, c.fixAction)}>{c.fixLabel ?? 'Do it for me'}</Button>}
                 {!c.ok && c.fixUrl && !c.fixAction && <a className="btn btn-ghost btn-sm" href={c.fixUrl} target="_blank" rel="noreferrer">{c.fixLabel ?? 'How'} <Icon name="external" size={13} /></a>}
                 {recipe && <button className="text-bone-3 hover:text-bone p-1" onClick={() => setOpen(isOpen ? null : c.id)} aria-label="details"><Icon name="chevronDown" size={16} className={cx('transition-transform', isOpen && 'rotate-180')} /></button>}
               </div>
               {isOpen && recipe && (
-                <div className="px-5 pb-5 pt-1 bg-ink-3/40">
+                <div className="px-5 pb-5 pt-1 bg-ink">
                   <p className="text-[13.5px] text-bone-2 mb-3">{recipe.why}</p>
                   <div className="grid md:grid-cols-3 gap-3">
                     {(['windows', 'mac', 'linux'] as const).map((p) => (

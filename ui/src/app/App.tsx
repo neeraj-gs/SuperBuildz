@@ -7,6 +7,11 @@ import { Dashboard } from '@/features/dashboard/Dashboard';
 import { Wizard } from '@/features/wizard/Wizard';
 import { Workspace } from '@/features/workspace/Workspace';
 
+/**
+ * One shell, one header. The header is defined here and nowhere else — an
+ * earlier version let the landing page draw its own, which meant two navs
+ * stacked on top of each other whenever a build went stale.
+ */
 export function App() {
   const route = useStore((s) => s.route);
   const connected = useStore((s) => s.connected);
@@ -20,47 +25,68 @@ export function App() {
     if (!detection) void useStore.getState().loadDetection().catch(() => {});
   }, [connected]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fullBleed = route.name === 'landing' || route.name === 'project';
+  // The workspace owns its whole viewport: its own header, its own scroll.
+  if (route.name === 'project') {
+    return (<><Workspace id={route.id} /><Toasts /></>);
+  }
+
+  const overlay = route.name === 'landing';
 
   return (
     <div className="min-h-full flex flex-col">
-      {route.name !== 'project' && route.name !== 'landing' && <TopBar />}
-      <main className={cx('flex-1', !fullBleed && 'px-6 md:px-10 lg:px-14 pb-20')}>
+      <TopBar overlay={overlay} />
+      <main className={cx('flex-1', overlay ? '' : 'pb-24')}>
         {route.name === 'landing' && <Landing />}
         {route.name === 'setup' && <Setup />}
         {route.name === 'projects' && <Dashboard />}
         {route.name === 'new' && <Wizard />}
-        {route.name === 'project' && <Workspace id={route.id} />}
       </main>
       <Toasts />
     </div>
   );
 }
 
-function TopBar() {
+function TopBar({ overlay }: { overlay: boolean }) {
   const route = useStore((s) => s.route);
   const connected = useStore((s) => s.connected);
   const detection = useStore((s) => s.detection);
   const ready = detection?.ok;
-  const onLanding = route.name === 'landing';
+
   return (
-    <header className={cx('sticky top-0 z-40 h-14 flex items-center justify-between px-6 md:px-10 lg:px-14', onLanding ? 'bg-transparent' : 'bg-ink/80 backdrop-blur border-b border-line')}>
-      <button onClick={() => navigate({ name: 'landing' })} className="flex items-center"><Logo /></button>
-      <nav className="flex items-center gap-1">
-        <NavLink on={route.name === 'setup'} onClick={() => navigate({ name: 'setup' })}>
-          <Dot on={!!ready} className={cx(!detection && 'pulse-dot')} /> Requirements
-        </NavLink>
-        <NavLink on={route.name === 'projects'} onClick={() => navigate({ name: 'projects' })}>Projects</NavLink>
-        <Button variant="primary" size="sm" icon="plus" className="ml-2" onClick={() => navigate({ name: 'new' })}>New site</Button>
-        {!connected && <span className="telemetry text-danger ml-3">daemon offline</span>}
-      </nav>
+    <header
+      className={cx(
+        'sticky top-0 z-50 h-[52px] shrink-0',
+        overlay ? 'bg-transparent' : 'bg-ink/85 backdrop-blur-xl border-b border-line',
+      )}
+    >
+      <div className="h-full bleed flex items-center justify-between gap-4">
+        <button onClick={() => navigate({ name: 'landing' })} className="flex items-center shrink-0" aria-label="Super Builds — home">
+          <Logo />
+        </button>
+
+        <nav className="flex items-center gap-1">
+          <NavLink on={route.name === 'setup'} onClick={() => navigate({ name: 'setup' })}>
+            <Dot on={!!ready} tone={detection && !ready ? 'danger' : 'volt'} className={cx(!detection && 'pulse-dot')} />
+            <span className="hidden sm:inline">Requirements</span>
+          </NavLink>
+          <NavLink on={route.name === 'projects'} onClick={() => navigate({ name: 'projects' })}>Projects</NavLink>
+          <Button variant="primary" size="sm" icon="plus" className="ml-1.5" onClick={() => navigate({ name: 'new' })}>New site</Button>
+          {!connected && <span className="telemetry text-danger ml-2 hidden md:inline">daemon offline</span>}
+        </nav>
+      </div>
     </header>
   );
 }
 
 function NavLink({ children, on, onClick }: { children: React.ReactNode; on?: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={cx('inline-flex items-center gap-2 h-9 px-3 rounded-full text-[13.5px] transition-colors', on ? 'text-bone bg-ink-3' : 'text-bone-2 hover:text-bone hover:bg-ink-2')}>
+    <button
+      onClick={onClick}
+      className={cx(
+        'inline-flex items-center gap-2 h-8 px-3 rounded-lg text-[13px] transition-colors',
+        on ? 'text-bone bg-ink-3' : 'text-bone-3 hover:text-bone hover:bg-ink-2',
+      )}
+    >
       {children}
     </button>
   );

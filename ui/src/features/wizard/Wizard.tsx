@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Catalogue, DesignDNA, Plan, Spec } from '@superbuilds/protocol';
 import { api, type Question } from '@/lib/api';
 import { useStore, navigate, toast } from '@/lib/store';
-import { Button, Chip, Input, Spinner, Textarea, cx } from '@/components/ui';
+import { Button, Chip, Index, Input, Spinner, Textarea, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { ChipMany, PickMany, PickOne, PickSwatch } from './Pickers';
 import { LivePreview } from './LivePreview';
@@ -119,7 +119,7 @@ export function Wizard() {
   const progressPct = ((at + 1) / STEPS.length) * 100;
 
   return (
-    <div className="max-w-[1500px] mx-auto pt-6">
+    <div className="shell-wide pt-8">
       {/* Progress */}
       <div className="flex items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-3 min-w-0">
@@ -138,9 +138,9 @@ export function Wizard() {
 
       <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(380px,44%)] gap-10 items-start">
         <div className="min-w-0">
-          <p className="legend mb-3 text-volt">{step.id === 'go' ? 'Ready' : `Step ${at + 1}`}</p>
-          <h1 className="display text-[clamp(1.9rem,3.8vw,3.4rem)]">{step.title}</h1>
-          <p className="lede mt-3 mb-8">{step.lede}</p>
+          <Index n={at + 1} className="mb-4">{step.id === 'go' ? 'Ready to build' : step.id}</Index>
+          <h1 className="d3">{step.title}</h1>
+          <p className="copy mt-3 mb-8">{step.lede}</p>
 
           <div key={step.id} className="fade">
             {step.id === 'what' && (
@@ -283,7 +283,7 @@ function GoStep({ spec, plan, showBrief, setShowBrief, setSpec, folderNote, ques
             <div className="flex items-center justify-between mb-3"><span className="legend">Stages</span><span className="telemetry text-bone-3">{plan.estimate.minutes[0]}–{plan.estimate.minutes[1]} min · roughly ${plan.estimate.lowUsd}–{plan.estimate.highUsd} of usage</span></div>
             <ol className="grid sm:grid-cols-2 gap-2">
               {[{ id: 'scaffold', label: 'Template and dependencies', blurb: 'Copy the starter, write your tokens, install' }, ...plan.stages].map((s, i) => (
-                <li key={s.id} className="flex gap-3 rounded-lg bg-ink-3 border border-line p-3"><span className="telemetry text-volt w-5">{i}</span><div><div className="font-semibold text-[14px]">{s.label}</div><div className="text-[12.5px] text-bone-3">{s.blurb}</div></div></li>
+                <li key={s.id} className="flex gap-3 rounded-lg bg-ink-3 border border-line p-3"><span className="telemetry text-volt w-5">{i}</span><div><div className="font-semibold text-[13.5px]">{s.label}</div><div className="text-[12.5px] text-bone-3 leading-snug mt-0.5">{s.blurb}</div></div></li>
               ))}
             </ol>
             <p className="telemetry text-bone-3 mt-3">{plan.estimate.caveat}</p>
@@ -296,7 +296,7 @@ function GoStep({ spec, plan, showBrief, setShowBrief, setSpec, folderNote, ques
             </label>
             <div className="opt" data-on={!!spec.budgetUsd}>
               <div className="flex items-center justify-between"><span className="font-semibold">Spending ceiling</span><span className="telemetry text-bone-2">{spec.budgetUsd ? `$${spec.budgetUsd}` : 'none'}</span></div>
-              <input type="range" min={0} max={60} step={5} value={spec.budgetUsd ?? 0} onChange={(e) => setSpec((s) => ({ ...s, budgetUsd: Number(e.target.value) || undefined }))} className="w-full mt-2 accent-[#C8FF3D]" />
+              <input type="range" min={0} max={60} step={5} value={spec.budgetUsd ?? 0} onChange={(e) => setSpec((s) => ({ ...s, budgetUsd: Number(e.target.value) || undefined }))} className="slider mt-2" />
               <span className="text-[12.5px] text-bone-3">Stops the build if Claude Code reports more than this. Optional; on a subscription it is usage, not dollars.</span>
             </div>
           </div>

@@ -90,13 +90,13 @@ export function LivePreview({ spec, catalogue, name }: { spec: Partial<Spec>; ca
             <div className={cx('pointer-events-none flex flex-col justify-between p-5', layout === 'split-stage' ? 'relative h-full' : 'absolute inset-0')} key={beat}>
               <div className="flex items-center justify-between">
                 <span className="rise text-[11px] tracking-[0.18em] uppercase" style={{ fontFamily: face.display, animationDuration: 'var(--pace)' }}>{title.slice(0, 18)}</span>
-                <span className="rise d2 flex gap-1.5" style={{ animationDuration: 'var(--pace)' }}><i className="block w-8 h-1.5 rounded" style={{ background: palette.fg, opacity: .8 }} /><i className="block w-3 h-1.5 rounded" style={{ background: palette.accent }} /></span>
+                <span className="rise s2 flex gap-1.5" style={{ animationDuration: 'var(--pace)' }}><i className="block w-8 h-1.5 rounded" style={{ background: palette.fg, opacity: .8 }} /><i className="block w-3 h-1.5 rounded" style={{ background: palette.accent }} /></span>
               </div>
               <div>
-                <div className="rise d1 leading-[0.92]" style={{ fontFamily: face.display, fontWeight: face.weight, letterSpacing: face.tracking, fontSize: 'clamp(28px, 7.5cqw, 54px)', textTransform: face.transform as CSSProperties['textTransform'], animationDuration: 'var(--pace)', textShadow: `0 2px 30px ${palette.bg}` }}>
+                <div className="rise s1 leading-[0.92]" style={{ fontFamily: face.display, fontWeight: face.weight, letterSpacing: face.tracking, fontSize: 'clamp(28px, 7.5cqw, 54px)', textTransform: face.transform as CSSProperties['textTransform'], animationDuration: 'var(--pace)', textShadow: `0 2px 30px ${palette.bg}` }}>
                   {spec.scene !== 'wordmark' && <>{title}<br /></>}<span style={{ color: palette.accent }}>{tagFor(spec.archetype)}</span>
                 </div>
-                <div className="rise d3 flex gap-2 mt-4" style={{ animationDuration: 'var(--pace)' }}>
+                <div className="rise s3 flex gap-2 mt-4" style={{ animationDuration: 'var(--pace)' }}>
                   <span className="inline-block h-7 w-24 rounded-full" style={{ background: palette.accent, borderRadius: radius * 2 }} />
                   <span className="inline-block h-7 w-16 rounded-full border" style={{ borderColor: palette.fg, opacity: .7, borderRadius: radius * 2 }} />
                 </div>

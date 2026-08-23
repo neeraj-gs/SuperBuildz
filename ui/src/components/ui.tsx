@@ -8,23 +8,28 @@ export const cx = (...parts: Array<string | false | null | undefined>) => parts.
 
 type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'quiet' | 'danger'; size?: 'sm' | 'md' | 'lg'; icon?: string; busy?: boolean; iconRight?: string };
 export function Button({ variant = 'ghost', size = 'md', icon, iconRight, busy, className, children, disabled, ...rest }: BtnProps) {
+  const iconOnly = !children && (!!icon || !!iconRight || !!busy);
   return (
-    <button className={cx('btn', `btn-${variant}`, size === 'sm' && 'btn-sm', size === 'lg' && 'btn-lg', className)} disabled={disabled || busy} {...rest}>
-      {busy ? <Spinner size={14} /> : icon ? <Icon name={icon} size={size === 'sm' ? 14 : 16} /> : null}
+    <button
+      className={cx('btn', `btn-${variant}`, size === 'sm' && 'btn-sm', size === 'lg' && 'btn-lg', iconOnly && 'btn-icon', className)}
+      disabled={disabled || busy}
+      {...rest}
+    >
+      {busy ? <Spinner size={14} /> : icon ? <Icon name={icon} size={size === 'sm' ? 14 : 15} /> : null}
       {children}
-      {iconRight && !busy ? <Icon name={iconRight} size={size === 'sm' ? 14 : 16} /> : null}
+      {iconRight && !busy ? <Icon name={iconRight} size={size === 'sm' ? 14 : 15} /> : null}
     </button>
   );
 }
 
-export function Spinner({ size = 16, className }: { size?: number; className?: string }) {
-  return <span className={cx('spin inline-block rounded-full border-2 border-current border-r-transparent', className)} style={{ width: size, height: size }} aria-label="working" />;
+export function Spinner({ size = 15, className }: { size?: number; className?: string }) {
+  return <span className={cx('spin inline-block rounded-full border-2 border-current border-r-transparent shrink-0', className)} style={{ width: size, height: size }} aria-label="working" />;
 }
 
-export function Chip({ children, onClick, icon, className, active }: { children: ReactNode; onClick?: () => void; icon?: string; className?: string; active?: boolean }) {
+export function Chip({ children, onClick, icon, className, active, title }: { children: ReactNode; onClick?: () => void; icon?: string; className?: string; active?: boolean; title?: string }) {
   return (
-    <button type="button" onClick={onClick} className={cx('chip', active && 'border-volt bg-volt-2', className)}>
-      {icon && <Icon name={icon} size={14} />}{children}
+    <button type="button" title={title} onClick={onClick} data-on={active ? 'true' : undefined} className={cx('chip', className)}>
+      {icon && <Icon name={icon} size={13} />}{children}
     </button>
   );
 }
@@ -37,36 +42,54 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
     <label className="block">
       <span className="legend block mb-1.5">{label}</span>
       {children}
-      {hint && <span className="block mt-1.5 text-[12.5px] text-bone-3">{hint}</span>}
+      {hint && <span className="block mt-1.5 text-[13px] text-bone-3">{hint}</span>}
     </label>
   );
 }
 
-export function Logo({ size = 22, wordmark = true }: { size?: number; wordmark?: boolean }) {
+/**
+ * The index rule: `01 ──────── LABEL`. Used at the top of every section in the
+ * tool, so the whole product reads as one document.
+ */
+export function Index({ n, children, className }: { n?: string | number; children: ReactNode; className?: string }) {
+  return (
+    <div className={cx('index legend', className)}>
+      {n !== undefined && <span className="text-volt">{typeof n === 'number' ? String(n).padStart(2, '0') : n}</span>}
+      <span>{children}</span>
+    </div>
+  );
+}
+
+export function Logo({ size = 20, wordmark = true }: { size?: number; wordmark?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2.5 select-none">
-      <span className="inline-grid place-items-center rounded-[7px] bg-volt text-ink" style={{ width: size + 6, height: size + 6 }}>
-        <Icon name="logo" size={size - 2} strokeWidth={2.2} />
+      <span className="inline-grid place-items-center rounded-[6px] bg-volt text-[color:var(--color-volt-ink)] shrink-0" style={{ width: size + 5, height: size + 5 }}>
+        <Icon name="logo" size={size - 4} strokeWidth={2.4} />
       </span>
-      {wordmark && <span className="display-sm tracking-[0.12em] text-[13px] uppercase">Super<span className="text-volt">Builds</span></span>}
+      {wordmark && (
+        <span className="font-[family-name:var(--font-display)] font-extrabold tracking-[-0.02em] text-[14px] leading-none">
+          Super<span className="text-bone-3">Builds</span>
+        </span>
+      )}
     </span>
   );
 }
 
-export function Dot({ on, className }: { on?: boolean; className?: string }) {
-  return <span className={cx('inline-block w-2 h-2 rounded-full', on ? 'bg-volt' : 'bg-bone-4', className)} />;
+export function Dot({ on, tone = 'volt', className }: { on?: boolean; tone?: 'volt' | 'danger' | 'warn'; className?: string }) {
+  const c = on ? (tone === 'danger' ? 'bg-danger' : tone === 'warn' ? 'bg-warn' : 'bg-volt') : 'bg-bone-4';
+  return <span className={cx('inline-block w-[6px] h-[6px] rounded-full shrink-0', c, className)} />;
 }
 
 export function Toasts() {
   const toasts = useStore((s) => s.toasts);
   const dismiss = useStore((s) => s.dismissToast);
   return (
-    <div className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 max-w-[380px]">
+    <div className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 w-[min(380px,calc(100vw-40px))]">
       {toasts.map((t) => (
-        <div key={t.id} className={cx('panel rise px-4 py-3 text-[13.5px] flex items-start gap-3 shadow-2xl', t.kind === 'error' && 'border-danger/50', t.kind === 'ok' && 'border-volt/50')}>
-          <Icon name={t.kind === 'error' ? 'alert' : t.kind === 'ok' ? 'check' : 'sparkle'} size={16} className={t.kind === 'error' ? 'text-danger mt-0.5' : 'text-volt mt-0.5'} />
-          <span className="flex-1">{t.text}</span>
-          <button onClick={() => dismiss(t.id)} className="text-bone-3 hover:text-bone"><Icon name="x" size={14} /></button>
+        <div key={t.id} className={cx('panel rise px-3.5 py-3 text-[13px] flex items-start gap-2.5 shadow-2xl shadow-black/60', t.kind === 'error' && 'border-danger/40', t.kind === 'ok' && 'border-volt-3')}>
+          <Icon name={t.kind === 'error' ? 'alert' : t.kind === 'ok' ? 'check' : 'sparkle'} size={15} className={cx('mt-px shrink-0', t.kind === 'error' ? 'text-danger' : 'text-volt')} />
+          <span className="flex-1 text-bone-2 leading-relaxed">{t.text}</span>
+          <button onClick={() => dismiss(t.id)} className="text-bone-4 hover:text-bone shrink-0"><Icon name="x" size={13} /></button>
         </div>
       ))}
     </div>
@@ -89,7 +112,24 @@ export function Count({ to, suffix = '', duration = 900 }: { to: number; suffix?
     io.observe(el);
     return () => { io.disconnect(); cancelAnimationFrame(raf); };
   }, [to, duration]);
-  return <span ref={ref}>{n}{suffix}</span>;
+  return <span ref={ref} className="num">{n}{suffix}</span>;
+}
+
+/** Reveals its children once, when they first scroll into view. */
+export function Reveal({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setOn(true); io.disconnect(); } }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className={className} style={{ opacity: on ? 1 : 0, transform: on ? 'none' : 'translateY(14px)', transition: `opacity 700ms var(--sb-ease) ${delay}ms, transform 700ms var(--sb-ease) ${delay}ms` }}>
+      {children}
+    </div>
+  );
 }
 
 /** Very small markdown: paragraphs, bold, code, lists, links. Enough for chat. */
@@ -141,9 +181,9 @@ export function renderMd(src: string): string {
 export function Empty({ icon = 'sparkle', title, body, action }: { icon?: string; title: string; body?: string; action?: ReactNode }) {
   return (
     <div className="panel grid-bg relative overflow-hidden px-8 py-14 text-center">
-      <div className="mx-auto mb-4 grid place-items-center w-12 h-12 rounded-full border border-line-2 text-volt"><Icon name={icon} size={20} /></div>
-      <div className="display-sm text-[22px] mb-2">{title}</div>
-      {body && <p className="text-bone-2 max-w-[46ch] mx-auto">{body}</p>}
+      <div className="mx-auto mb-4 grid place-items-center w-11 h-11 rounded-full border border-line-2 bg-ink text-volt"><Icon name={icon} size={18} /></div>
+      <div className="d4 mb-1.5">{title}</div>
+      {body && <p className="copy mx-auto text-center">{body}</p>}
       {action && <div className="mt-6 flex justify-center">{action}</div>}
     </div>
   );

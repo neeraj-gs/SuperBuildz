@@ -26,9 +26,9 @@ export function DeployPanel({ projectId, onClose }: { projectId: string; onClose
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-ink/60 backdrop-blur-sm" />
-      <aside className="relative w-full max-w-[520px] h-full bg-ink-2 border-l border-line overflow-y-auto p-6 rise" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6"><div><p className="legend mb-1">Publish</p><h2 className="display-sm text-[24px]">Put it on Vercel.</h2></div><button onClick={onClose} className="text-bone-3 hover:text-bone"><Icon name="x" size={18} /></button></div>
-        <p className="text-[13.5px] text-bone-2 mb-6">Everything runs the Vercel CLI in your project folder. You sign in through your own browser; Super Builds never sees the token. The first publish creates the project; later ones update it.</p>
+      <aside className="relative w-full max-w-[520px] h-full bg-ink-2 border-l border-line overflow-y-auto p-6 rise shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6"><div><p className="legend mb-1">Publish</p><h2 className="d3">Put it on Vercel.</h2></div><button onClick={onClose} className="text-bone-3 hover:text-bone"><Icon name="x" size={18} /></button></div>
+        <p className="copy mb-6">Everything runs the Vercel CLI in your project folder. You sign in through your own browser; Super Builds never sees the token. The first publish creates the project; later ones update it.</p>
 
         {!state ? <div className="flex items-center gap-2 text-bone-3"><Spinner /> Checking…</div> : (
           <div className="space-y-3">

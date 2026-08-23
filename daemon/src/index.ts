@@ -52,10 +52,27 @@ mkdirSync(capturesDir(), { recursive: true });
 mkdirSync(thumbsDir(), { recursive: true });
 await app.register(fastifyStatic, { root: capturesDir(), prefix: '/captures/', decorateReply: false });
 await app.register(fastifyStatic, { root: thumbsDir(), prefix: '/thumbs/', decorateReply: false });
-if (existsSync(join(uiDist(), 'index.html'))) {
-  await app.register(fastifyStatic, { root: uiDist(), prefix: '/', decorateReply: true, wildcard: false });
+if (DEV) {
+  // In development the interface is served by Vite with reload; the built
+  // `ui/dist` here is whatever `npm run build` last produced, which is a trap
+  // — you edit a screen, reload :7747, and see the old one. So don't serve it.
+  const VITE = 'http://127.0.0.1:5180';
   app.setNotFoundHandler((req, reply) => {
     if (req.url.startsWith('/api') || req.url.startsWith('/hooks')) return reply.code(404).send({ error: 'not found' });
+    return reply.code(302).redirect(VITE + req.url);
+  });
+} else if (existsSync(join(uiDist(), 'index.html'))) {
+  // `wildcard: true` resolves each request against the directory as it is now,
+  // so rebuilding the interface while the daemon runs serves the new bundle.
+  // Pinning routes at boot made a rebuild answer new asset URLs with the SPA
+  // fallback, and the browser refused the HTML as a module script.
+  await app.register(fastifyStatic, { root: uiDist(), prefix: '/', decorateReply: true, wildcard: true });
+  app.setNotFoundHandler((req, reply) => {
+    if (req.url.startsWith('/api') || req.url.startsWith('/hooks')) return reply.code(404).send({ error: 'not found' });
+    // Only client routes fall back to the shell. A missing asset must 404, or
+    // the browser gets HTML where it asked for JavaScript.
+    const path = req.url.split('?')[0];
+    if (/\.[a-z0-9]{2,5}$/i.test(path)) return reply.code(404).send({ error: 'not found' });
     return reply.sendFile('index.html');
   });
 }
@@ -264,7 +281,7 @@ wss.on('connection', (ws, req) => {
   ws.on('error', () => removeClient(ws));
 });
 
-console.log(`Super Builds daemon on http://${HOST}:${PORT}${DEV ? ' (dev)' : ''}`);
+console.log(`Super Builds daemon on http://${HOST}:${PORT}${DEV ? " (dev — open the interface at http://127.0.0.1:5180)" : ""}`);
 
 const shutdown = async () => {
   closeAll();
