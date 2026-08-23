@@ -12,6 +12,7 @@ import { Icon } from '@/components/icons';
 import { Chat } from './Chat';
 import { Stages } from './Stages';
 import { DeployPanel } from './DeployPanel';
+import { TweakPanel } from './TweakPanel';
 
 export function Workspace({ id }: { id: string }) {
   const project = useStore((s) => s.projects[id]);
@@ -22,6 +23,7 @@ export function Workspace({ id }: { id: string }) {
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [view, setView] = useState<'site' | 'admin'>('site');
   const [showDeploy, setShowDeploy] = useState(false);
+  const [tuning, setTuning] = useState(false);
   const [reload, setReload] = useState(0);
   const [starting, setStarting] = useState(false);
 
@@ -78,8 +80,9 @@ export function Workspace({ id }: { id: string }) {
           {session ? <Chat session={session} projectId={id} busy={!!generation?.running} /> : <div className="flex-1 grid place-items-center text-bone-3"><Spinner /></div>}
         </aside>
 
-        {/* Right: preview */}
-        <section className="min-h-0 flex flex-col bg-ink-3/40">
+        {/* Right: preview, with the tweak rail beside it */}
+        <section className="min-h-0 flex flex-col bg-ink-3/40 lg:flex-row">
+          <div className="min-h-0 flex-1 flex flex-col">
           <div className="h-11 shrink-0 flex items-center justify-between px-3 border-b border-line gap-2">
             <div className="flex items-center gap-1">
               <Seg on={view === 'site'} onClick={() => setView('site')}>Site</Seg>
@@ -88,6 +91,8 @@ export function Workspace({ id }: { id: string }) {
             <div className="flex items-center gap-1">
               <Seg on={device === 'desktop'} onClick={() => setDevice('desktop')} title="Desktop"><Icon name="monitor" size={14} /></Seg>
               <Seg on={device === 'mobile'} onClick={() => setDevice('mobile')} title="Phone"><Icon name="phone" size={14} /></Seg>
+              <span className="w-px h-5 bg-line mx-1" />
+              <Seg on={tuning} onClick={() => setTuning((t) => !t)} title="Tune the design — colour, type, space, motion"><Icon name="sliders" size={14} /> Tune</Seg>
               <span className="w-px h-5 bg-line mx-1" />
               {preview?.running ? (
                 <>
@@ -119,6 +124,8 @@ export function Workspace({ id }: { id: string }) {
               </div>
             )}
           </div>
+          </div>
+          {tuning && project.status !== 'draft' && <TweakPanel projectId={id} onClose={() => setTuning(false)} />}
         </section>
       </div>
 

@@ -22,5 +22,7 @@
     },
     "types": ["vite/client"]
   },
-  "include": ["src", "../design-library/scenes", "../packages/protocol/src"]
+  "include": ["src", "../design-library/scenes", "../packages/protocol/src"],
+  "//exclude": "loaders.ts resolves `@/components/scenes/*`, which only exists once the scaffold has copied this folder into a generated site. It is shipped, not compiled here.",
+  "exclude": ["../design-library/scenes/loaders.ts"]
 }

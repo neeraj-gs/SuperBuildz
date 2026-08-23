@@ -246,6 +246,51 @@ export interface Imagery {
   instead: string[];
 }
 
+/**
+ * The live tweak panel.
+ *
+ * Everything a person can change by dragging rather than describing. The
+ * values land in the project's `design.tweaks.json`, which `lib/tokens.ts`
+ * merges over `design.config.ts` — so a slider and an edit by the build never
+ * fight over the same file, and clearing the object is a complete undo.
+ */
+export interface Tweaks {
+  bg?: string; fg?: string; accent?: string; surface?: string; muted?: string;
+  displayScale?: number; displayTracking?: number; bodyScale?: number; measure?: number;
+  radius?: number; section?: number; gutter?: number;
+  pace?: number; rise?: number; stagger?: number;
+  grain?: number; sceneDim?: number; sceneBrightness?: number;
+}
+
+export type TweakKind = 'colour' | 'range';
+
+/** One control in the panel. The daemon owns this list so the UI cannot drift. */
+export interface TweakControl {
+  key: keyof Tweaks;
+  label: string;
+  group: string;
+  kind: TweakKind;
+  /** ranges only */
+  min?: number; max?: number; step?: number;
+  /** How to render the current value beside the slider. */
+  unit?: string;
+  /** What it is for, in one line, for the person who has never seen a design system. */
+  hint?: string;
+}
+
+/** A named set of tweaks, so one press can change the whole feel. */
+export interface TweakPreset { id: string; label: string; blurb: string; values: Tweaks }
+
+export interface TweakState {
+  projectId: string;
+  /** What is set right now. Absent keys use the designed value. */
+  values: Tweaks;
+  /** The designed values, so the panel can show what "back to normal" is. */
+  designed: Tweaks;
+  controls: TweakControl[];
+  presets: TweakPreset[];
+}
+
 /** One of the visual directions built for the person to choose between. */
 export interface Direction {
   id: string;
@@ -405,6 +450,7 @@ export type ServerEvent =
   | { type: 'preview.update'; state: PreviewState }
   | { type: 'deploy.update'; state: DeployState }
   | { type: 'reference.update'; capture: ReferenceCapture }
+  | { type: 'tweaks.update'; state: TweakState }
   | { type: 'install.update'; message: string };
 
 /* ---------------------------------------------------------------------------

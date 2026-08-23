@@ -1,0 +1,3 @@
+{
+  "$comment": "Live tweaks, written by the panel in Super Builds. Everything here overrides design.config.ts; delete a key to go back to the designed value, or empty this file to {} to reset entirely. Kept separate so a slider drag and an edit by the build never fight over the same file."
+}

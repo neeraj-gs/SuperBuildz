@@ -5,7 +5,7 @@
 
 import type {
   Catalogue, Detection, InstallRecipeView, Plan, Project, Session, Spec, GenerationState, PreviewState, DeployState,
-  ReferenceCapture, Choice,
+  ReferenceCapture, Choice, TweakState, Tweaks,
 } from '@superbuilds/protocol';
 
 let token = '';
@@ -80,6 +80,11 @@ export const api = {
   referenceAvailable: () => get<{ ok: boolean; reason?: string }>('/api/reference/available'),
   capture: (url: string) => post<ReferenceCapture>('/api/reference', { url }),
   captureState: (id: string) => get<ReferenceCapture>(`/api/reference/${id}`),
+
+  tweaks: (id: string) => get<TweakState>(`/api/projects/${id}/tweaks`),
+  setTweaks: (id: string, values: Record<string, unknown> | Tweaks, replace = false) =>
+    post<TweakState>(`/api/projects/${id}/tweaks`, { values, replace }),
+  shuffleTweaks: (id: string) => post<TweakState>(`/api/projects/${id}/tweaks/shuffle`),
 
   deployStatus: (id: string) => get<DeployState>(`/api/projects/${id}/deploy`),
   deployLogin: (id: string) => post<{ ok: boolean; message: string }>(`/api/projects/${id}/deploy/login`),

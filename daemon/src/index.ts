@@ -29,6 +29,7 @@ import { previewState, startPreview, stopPreview, stopAllPreviews } from './prev
 import { startCapture, getCapture, captureAvailable, thumbnailFor } from './reference.ts';
 import { deployStatus, vercelLogin, deployProject, setEnvValue } from './deploy.ts';
 import { judge, hookResponse } from './policy.ts';
+import { tweakState, setTweaks, shufflePalette } from './tweaks.ts';
 import { superbuildsHome, uiDist } from './paths.ts';
 
 const PORT = Number(process.env.SUPERBUILDS_PORT ?? 7747);
@@ -240,6 +241,28 @@ app.post('/api/projects/:id/deploy', async (req, reply) => {
   const { target } = (req.body ?? {}) as { target?: 'production' | 'preview' };
   try { return await deployProject((req.params as { id: string }).id, target === 'preview' ? 'preview' : 'production'); } catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
 });
+/* The tweak panel: design by dragging, written to the project's design.tweaks.json */
+
+app.get('/api/projects/:id/tweaks', async (req, reply) => {
+  try { return tweakState((req.params as { id: string }).id); }
+  catch (err) { return reply.code(404).send({ error: (err as Error).message }); }
+});
+app.post('/api/projects/:id/tweaks', async (req, reply) => {
+  const { values, replace } = (req.body ?? {}) as { values?: Record<string, unknown>; replace?: boolean };
+  try {
+    const state = setTweaks((req.params as { id: string }).id, values ?? {}, replace === true);
+    broadcast({ type: 'tweaks.update', state });
+    return state;
+  } catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.post('/api/projects/:id/tweaks/shuffle', async (req, reply) => {
+  try {
+    const state = shufflePalette((req.params as { id: string }).id);
+    broadcast({ type: 'tweaks.update', state });
+    return state;
+  } catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+
 app.post('/api/projects/:id/env', async (req, reply) => {
   const p = getProject((req.params as { id: string }).id); if (!p) return reply.code(404).send({ error: 'no such project' });
   const { key, value } = (req.body ?? {}) as { key?: string; value?: string };
