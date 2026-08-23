@@ -5,9 +5,15 @@ own Claude Code, on your own machine, published to Vercel in one press.**
 
 Super Builds is for people who do not write code. Every question is answered by
 choosing — a kind of business, a colour direction, a 3D scene you can see move
-before you commit, an analytics choice — and the system compiles those choices
-into the brief an experienced studio would have written, hands it to Claude Code
-in a real Next.js project, previews the result beside a chat, and publishes it.
+before you commit, what a visitor should believe by the end, the one thing the
+site does that others do not — and the system compiles those choices into the
+brief an experienced studio would have written, hands it to Claude Code in a
+real Next.js project, previews the result beside a chat, and publishes it.
+
+Then two ways to change it without describing anything: **three complete visual
+directions**, built from your own site and shown side by side so you can point
+at one, and a **tune panel** of eighteen sliders — colour, type, space, motion,
+grain — that changes the site under your hand.
 
 Nothing is uploaded, no account is created, no token is held. It spawns the
 Claude Code you already have, against the subscription you already pay for.
@@ -45,7 +51,8 @@ packages/protocol/   The contract between daemon and UI
 daemon/              Fastify + ws on 127.0.0.1:7747. Spawns claude, runs previews, deploys
 ui/                  React + Vite + Tailwind + React Three Fiber
 design-library/      3D scenes, skills, references — shared by the wizard and every generated site
-templates/site/      The Next.js starter every site begins from (CRM, analytics, tokens, scenes)
+templates/site/      The Next.js starter every site begins from (CRM, analytics, tokens,
+                     a page-wide scene layer, scroll devices, composed imagery, real form controls)
 docs/                ARCHITECTURE.md and SECURITY.md — every decision, and why
 ```
 

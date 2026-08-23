@@ -99,15 +99,70 @@ drives it turn by turn:
 | Stage | What the turn asks for | Verified by |
 | --- | --- | --- |
 | 0 scaffold | daemon copies template, writes tokens, `.env.local`, `CLAUDE.md`, skills; `npm install` | exit code |
-| 1 identity | tokens, type, palette, the hero scene adapted to the business | build passes; a screenshot is taken |
-| 2 pages | every chosen page, real copy, forms wired, navigation | build passes; screenshots |
-| 3 motion | scroll system, hovers, transitions, reduced-motion | build passes |
+| 1 identity | tokens, type, palette, the scene adapted to the business, **the signature move**, the scene mounted page-wide | build passes; screenshots at 1440 **and 390** — a scene that crops its subject out of portrait fails |
+| 2 pages | every chosen page, real copy, forms wired, navigation, **a scroll device per beat**, **`<Figure>` wherever a picture goes** | build passes; every screenshot looked at for empty rectangles and OS widgets |
+| 3 motion | scroll system, hovers, transitions, reduced-motion, **pacing** | build passes; `npm run shot -- --scroll` six frames, read in order |
 | 4 CRM | form → lead mapping, pipeline stages, KPI definitions, analytics events | build passes; a test submission lands in `/admin` |
 | 5 review | the "award jury" pass: score against the rubric, fix what fails | build passes; Lighthouse-style budget checked |
 
 Every stage is a checkpoint (`checkpoints.ts`) and a git commit, so anything can
 be put back. The preview starts as soon as stage 0 finishes, so the person
-watches the site appear.
+watches the site appear. When stage 1 lands, three visual directions are
+proposed in the background so they are waiting rather than costing a wait.
+
+## 5a. What the sites were getting wrong, and where each fix lives
+
+A real build (Ember and Oak, section 11) produced a hero that would pass a jury
+and a page that would not. Studying it beside the reference sites — and two
+walkthroughs of comparable tools, Nate Herk's ScrollCraft and Chase's
+clone/remix cycle — gave five specific failures. Each is fixed in the
+*template*, so every future site inherits it, rather than in a prompt that hopes:
+
+| What went wrong | Where the fix lives |
+| --- | --- |
+| The scene died at 100vh; below it, a well-typeset dark page | `components/SceneLayer.tsx` — one canvas under the whole document, driven by `data-scene-frame` / `data-scene-dim` on each section. `SceneCanvas` is now the exception. |
+| Sections were empty rounded rectangles with a number in the corner | `components/ui/Figure.tsx` — a real photograph, or a *composed* plate (`type` / `field` / `draft` / `band`). The template shipped the bad pattern itself, which is what got copied. |
+| Forms showed OS widgets, and `mm/dd/yyyy` for a Lisbon restaurant | `components/ui/Controls.tsx` — `Select` and `DateField`, keyboard-complete, formatted with `Intl` against `design.locale`, which `scaffold.ts` derives from the business's location. |
+| Portrait cropped the subject out of the hero | `SceneProps.portrait`, and the identity stage screenshots 390px and looks. |
+| Nothing was memorable | The signature move: chosen in the wizard, decided in stage 1, named in `design.config.ts` and README, with nothing allowed to compete. `scroll-craft` skill + `components/ui/Scroll.tsx` (`Pinned`, `HorizontalTrack`, `Counter`, `Focus`, `Draw`, `Marquee`) make "every section earns its scroll" into working parts. |
+
+The rubric grew from twelve lines to seventeen, the jury stage is on by
+default, and it is told what these builds got wrong so it knows what to look
+for rather than scoring its own work four everywhere.
+
+## 5b. Choosing without describing: directions and the tune panel
+
+The hardest moment in the flow is asking somebody who has never commissioned
+design what they want it to look like. They cannot answer — describing a
+design is a skill, recognising one is not. Two features exist for that.
+
+**Three directions** (`daemon/src/directions.ts`, `ui/.../Directions.tsx`).
+After the identity stage, three complete visual directions are proposed by a
+bounded ask and rendered side by side *from the real site*, scrolling
+together. `?direction=<id>` applies one for the length of a page view — no
+cookie, no write, no effect on any other visitor. A direction is a named set
+of tokens, not a different site: that limit is what makes it one cheap ask and
+an instant preview instead of three builds and an hour, and palette, weight,
+density and pace are what most people mean by "a different direction" anyway.
+
+**The tune panel** (`daemon/src/tweaks.ts`, `ui/.../TweakPanel.tsx`). Eighteen
+sliders and swatches — colour, type, space, motion, texture — plus presets and
+a shuffle. A chat turn costs thirty seconds and some usage and assumes you
+already know what you want; a slider is instant, free, reversible, and lets
+you find out by moving it.
+
+Both write to the project's `design.tweaks.json`, which `lib/tokens.ts` merges
+over `design.config.ts`. Two files on purpose: a slider drag and an edit by
+the build never touch the same file, Next hot-reloads on the write, `{}` is a
+complete and obvious undo, and the designed values stay legible in the repo.
+
+Two things this forced. Everything scalable is published as a base and a
+multiplier (`--display-size-base` × `--display-scale`) with the derivation in
+CSS, because reading the computed value back out of the cascade and
+multiplying it in JavaScript is order-dependent and silently produced
+`calc( * 1)`. And the WebGL scene reads the *live* CSS variables rather than
+`design.config.ts`, or a light direction renders a pale page with a black hero
+sitting in it.
 
 ## 6. The chat after generation
 
@@ -134,6 +189,9 @@ button.
 | --- | --- | --- |
 | Super Builds' own state (projects, specs, sessions, checkpoints) | JSON under `~/.superbuilds/` | No database to install; inspectable; PowerHouz's pattern, proven |
 | Generated sites | `~/SuperBuilds/<slug>/` by default; any folder | The person owns a normal Next.js project |
+| Live design tweaks | `<project>/design.tweaks.json` | Merged over `design.config.ts` at render. Separate so a slider and the build never fight; `{}` is a full undo |
+| Proposed directions | `<project>/directions.json` | Named token sets; `?direction=<id>` previews one without writing anything |
+| The person's photographs | copied into `<project>/public/media/` | Copied, never referenced: a project that breaks because somebody tidied their Pictures folder is not one they own |
 | CRM data, locally | SQLite via Node's built-in `node:sqlite` through `drizzle-orm/node-sqlite` | Zero native addons, zero accounts, the site and its CRM run the moment they are generated |
 | CRM data, deployed | Postgres via `DATABASE_URL` (Neon from the Vercel Marketplace, or Supabase) | Vercel's filesystem is ephemeral; Vercel Postgres is gone; Neon is the Vercel-native default, Supabase when auth/realtime/storage is wanted |
 | Admin login | Owner credential created at generation; `scrypt` from `node:crypto`; HttpOnly session cookie | No OAuth dependency, no native hashing addon, secure by default |

@@ -2,7 +2,7 @@
   "name": "superbuilds",
   "private": true,
   "version": "0.1.0",
-  "description": "Super Builds — press things, get an award-grade 3D website and a matching CRM, built by your own Claude Code.",
+  "description": "Super Builds \u2014 press things, get an award-grade 3D website and a matching CRM, built by your own Claude Code.",
   "type": "module",
   "workspaces": [
     "packages/*",
@@ -20,7 +20,8 @@
     "build": "npm --prefix ui run build",
     "typecheck": "npm --prefix daemon run typecheck && npm --prefix ui run typecheck",
     "test": "node daemon/test/run.mjs",
-    "template:install": "npm --prefix templates/site install"
+    "template:install": "npm --prefix templates/site install",
+    "shot": "node scripts/shot.mjs"
   },
   "//dependencies": "The daemon's. Listed here as well as in daemon/package.json so a published tarball resolves them; keep in step.",
   "dependencies": {

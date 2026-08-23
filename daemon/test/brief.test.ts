@@ -145,7 +145,15 @@ test('a location becomes a locale, and an unknown one is not American', () => {
   // It has to reach design.config.ts, or the date picker cannot use it.
   const src = designConfigSource(completeSpec({ ...defaultsFor('restaurant'), name: 'E', folder: '', details: { location: 'Lisbon' }, signature: 'the fire answers the pointer' }));
   assert.match(src, /locale: "pt-PT"/);
-  assert.match(src, /signature: "the fire answers the pointer"/);
+  assert.match(src, /signature: "the fire answers the pointer"/, 'a typed signature passes through');
+  // A pressed choice must be resolved: "subject-responds" is an id, and
+  // design.config.ts is read by people.
+  const pressed = designConfigSource(completeSpec({ ...defaultsFor('restaurant'), name: 'E', folder: '', signature: 'subject-responds' }));
+  assert.doesNotMatch(pressed, /subject-responds/);
+  assert.match(pressed, /The subject answers the pointer/);
+  // "Let it decide" is not a signature; it is the absence of one.
+  const decide = designConfigSource(completeSpec({ ...defaultsFor('restaurant'), name: 'E', folder: '', signature: 'decide' }));
+  assert.match(decide, /signature: ""/);
 });
 
 test('the review stage is on by default and knows what to look for', () => {

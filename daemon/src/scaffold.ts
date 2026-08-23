@@ -14,7 +14,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync
 import { join } from 'node:path';
 import type { Spec } from '@superbuilds/protocol';
 import { templateRoot, designLibraryRoot } from './paths.ts';
-import { PALETTES, sceneFor } from './catalogue/index.ts';
+import { PALETTES, sceneFor, SIGNATURES } from './catalogue/index.ts';
 import { TYPE_DIRECTION, masterBrief, sceneComponent } from './brief.ts';
 import { spawnBin, execPlain } from './binaries.ts';
 
@@ -140,11 +140,23 @@ export const design = {
    * elsewhere. Stage 1 names it here and in README.md; nothing else on the
    * site is allowed to compete with it.
    */
-  signature: ${JSON.stringify(spec.signature ?? '')},
+  signature: ${JSON.stringify(signatureSentence(spec.signature))},
 };
 
 export type Design = typeof design;
 `;
+}
+
+/**
+ * The wizard stores a choice id; this file is read by people. Resolve it to
+ * the sentence, and leave anything they typed themselves alone. Stage 1
+ * replaces it with the specific move it actually built.
+ */
+function signatureSentence(value: string | undefined): string {
+  if (!value || value === 'decide') return '';
+  const found = SIGNATURES.find((c) => c.id === value);
+  if (!found) return value;
+  return found.blurb ? `${found.label} — ${found.blurb}` : found.label;
 }
 
 /**
