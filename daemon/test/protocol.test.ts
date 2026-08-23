@@ -59,3 +59,33 @@ test('ports are stable per key and distinct across keys', async () => {
   assert.notEqual(a, b);
   releasePort('one'); releasePort('two');
 });
+
+test('a port held by a wildcard listener is not handed out as free', async () => {
+  const { createServer } = await import('node:net');
+  const { portFor, forgetPorts } = await import('../src/ports.ts');
+
+  forgetPorts();
+  const wanted = await portFor('preview:squat-check');
+  assert.ok(wanted, 'there should be a free port to test with');
+
+  // A dev server binds the wildcard (`::`, dual-stack). Probing 127.0.0.1
+  // specifically can succeed while that same bind fails, which is how a
+  // squatted port read as free and `next dev` then died with EADDRINUSE.
+  const squatter = createServer(() => {});
+  await new Promise<void>((r) => squatter.listen(wanted!, () => r()));
+  try {
+    forgetPorts();
+    const chosen = await portFor('preview:squat-check');
+    assert.notEqual(chosen, wanted, 'a port somebody is listening on must not be offered');
+  } finally {
+    await new Promise<void>((r) => squatter.close(() => r()));
+  }
+
+  // And it goes back to being the stable choice once it is released.
+  forgetPorts();
+  assert.equal(await portFor('preview:squat-check'), wanted);
+
+  // `avoid` gets you a different one, for retrying after a collision.
+  forgetPorts();
+  assert.notEqual(await portFor('preview:squat-check', [wanted!]), wanted);
+});

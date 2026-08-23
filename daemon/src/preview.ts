@@ -27,12 +27,17 @@ function push(projectId: string, patch: Partial<PreviewState>) {
   broadcast({ type: 'preview.update', state: r.state });
 }
 
-export async function startPreview(projectId: string, projectPath: string): Promise<PreviewState> {
+export async function startPreview(projectId: string, projectPath: string, avoid: number[] = []): Promise<PreviewState> {
   const existing = previews.get(projectId);
   if (existing && existing.child.exitCode === null) return existing.state;
 
-  const port = await portFor(`preview:${projectId}`);
-  if (!port) return { projectId, running: false, log: '', error: 'No free port between 43000 and 44999.' };
+  const port = await portFor(`preview:${projectId}`, avoid);
+  if (!port) {
+    const state: PreviewState = { projectId, running: false, log: '', error: 'No free port between 43000 and 44999.' };
+    previews.set(projectId, { child: { exitCode: 0 } as ChildProcess, state });
+    broadcast({ type: 'preview.update', state });
+    return state;
+  }
 
   const child = spawnBin('npm', ['run', 'dev', '--', '-p', String(port)], {
     cwd: projectPath, stdio: ['ignore', 'pipe', 'pipe'],
@@ -52,8 +57,31 @@ export async function startPreview(projectId: string, projectPath: string): Prom
   child.stderr?.setEncoding('utf8'); child.stderr?.on('data', onData);
   child.on('error', (err) => push(projectId, { running: false, error: err.message }));
   child.on('close', (code) => {
-    push(projectId, { running: false, exitCode: code ?? undefined, url: undefined });
+    const r = previews.get(projectId);
+    const log = r?.state.log ?? '';
+    const startedOk = !!r?.state.url;
     releasePort(`preview:${projectId}`);
+
+    // A dev server that dies before it ever answered has failed, and the
+    // person pressed a button to make it happen. Saying only "the preview is
+    // stopped" leaves them with a blank panel and no idea why — which is
+    // exactly what a squatted port looked like.
+    if (startedOk || code === 0 || code === null) {
+      push(projectId, { running: false, exitCode: code ?? undefined, url: undefined, error: undefined });
+      return;
+    }
+
+    if (portCollision(log) && avoid.length < 3) {
+      // Something else already holds the port — usually a dev server orphaned
+      // when a previous daemon was killed rather than closed. Move over rather
+      // than making this project permanently un-previewable.
+      push(projectId, { running: false, exitCode: code, url: undefined, error: `Port ${port} was taken. Trying another…` });
+      previews.delete(projectId);
+      void startPreview(projectId, projectPath, [...avoid, port]).catch(() => {});
+      return;
+    }
+
+    push(projectId, { running: false, exitCode: code, url: undefined, error: explain(log, code) });
   });
 
   // Poll until it answers, so `url` means "will render" rather than "was printed".
@@ -95,4 +123,45 @@ export async function killTree(child: ChildProcess) {
   } else {
     try { process.kill(-child.pid, 'SIGTERM'); } catch { try { child.kill('SIGTERM'); } catch {} }
   }
+}
+
+/** Did it fail because something already had the port? */
+function portCollision(log: string): boolean {
+  return /EADDRINUSE|address already in use|already in use/i.test(log);
+}
+
+/**
+ * The last thing worth reading out of a dev server's output. People do not
+ * read stack traces; they read one line and decide whether to try again.
+ *
+ * Known causes are matched against the whole log rather than a single line,
+ * because the messages that matter wrap: Windows prints "'next' is not
+ * recognized as an internal or external command," and then "operable program
+ * or batch file." on the next line, and taking the last line alone produced
+ * exactly that fragment as the explanation.
+ */
+function explain(log: string, code: number | null): string {
+  const clean = log.replace(/\u001b\[[0-9;]*m/g, '');
+  const flat = clean.replace(/\s+/g, ' ');
+
+  if (portCollision(flat)) return 'Every port it tried was already in use. Something else is running.';
+  if (/is not recognized as an internal or external command|command not found|ENOENT/i.test(flat)) {
+    return "The dev server could not be started — the project's dependencies are missing. Open the folder and run npm install.";
+  }
+  if (/Cannot find module|MODULE_NOT_FOUND/i.test(flat)) {
+    return 'A dependency is missing. Open the folder and run npm install.';
+  }
+  if (/Missing script: "?dev/i.test(flat)) return 'This folder has no `npm run dev` script, so there is nothing to preview.';
+  if (/EACCES|permission denied/i.test(flat)) return 'Permission denied starting the dev server in that folder.';
+
+  // Otherwise the last real sentence, joined with its continuation if it wrapped.
+  const lines = clean
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('at ') && !/^[>|]/.test(l) && !/^[{}]/.test(l));
+  const last = lines.at(-1);
+  if (!last) return `The dev server exited with code ${code}.`;
+  const prev = lines.at(-2);
+  const wrapped = prev && /[,;]$/.test(prev) ? `${prev} ${last}` : last;
+  return wrapped.slice(0, 220);
 }

@@ -115,13 +115,18 @@ export function Workspace({ id }: { id: string }) {
               </div>
             ) : (
               <div className="h-full grid place-items-center">
-                <div className="text-center max-w-[40ch]">
+                <div className="text-center max-w-[52ch]">
                   {preview?.running ? (
                     <><Spinner className="text-volt mx-auto" /><div className="mt-3 text-bone-2">Starting the site…</div><pre className="telemetry text-bone-4 mt-3 text-left max-h-40 overflow-auto whitespace-pre-wrap">{preview.log.slice(-1200)}</pre></>
                   ) : generation?.running && !generation.stages.find((s) => s.id === 'scaffold' && s.status === 'done') ? (
                     <><Spinner className="text-volt mx-auto" /><div className="mt-3 text-bone-2">Preparing the template. The preview starts as soon as it is installed.</div></>
+                  ) : preview?.error ? (
+                    <PreviewFailed error={preview.error} log={preview.log} onRetry={startPreview} busy={starting} />
                   ) : (
-                    <><Icon name="monitor" size={32} className="text-bone-4 mx-auto" /><div className="mt-3 text-bone-2">{project.status === 'draft' ? 'Build the site to see it here.' : 'The preview is stopped.'}</div>{preview?.error && <div className="text-danger telemetry mt-2">{preview.error}</div>}</>
+                    <>
+                      <Icon name="monitor" size={30} className="text-bone-4 mx-auto" />
+                      <div className="mt-3 text-bone-2">{project.status === 'draft' ? 'Build the site to see it here.' : 'The preview is stopped.'}</div>
+                    </>
                   )}
                 </div>
               </div>
@@ -134,6 +139,39 @@ export function Workspace({ id }: { id: string }) {
 
       {directions && <Directions projectId={id} url={url} onClose={() => setDirections(false)} />}
       {showDeploy && <DeployPanel projectId={id} onClose={() => setShowDeploy(false)} />}
+    </div>
+  );
+}
+
+/**
+ * A preview that would not start. The person pressed a button and nothing
+ * happened, so this owes them three things: what went wrong in one sentence,
+ * the output if they want it, and a way to try again without hunting for the
+ * control they already pressed.
+ */
+function PreviewFailed({ error, log, onRetry, busy }: { error: string; log: string; onRetry: () => void; busy: boolean }) {
+  const [showLog, setShowLog] = useState(false);
+  const trimmed = log.replace(/\u001b\[[0-9;]*m/g, '').trimEnd();
+  return (
+    <div className="text-left">
+      <div className="flex items-start gap-2.5">
+        <Icon name="alert" size={17} className="text-danger shrink-0 mt-0.5" />
+        <div className="min-w-0">
+          <div className="font-semibold text-[14px]">The preview did not start.</div>
+          <p className="text-[13px] text-bone-2 mt-1 leading-relaxed">{error}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-4">
+        <Button size="sm" variant="primary" icon="play" busy={busy} onClick={onRetry}>Try again</Button>
+        {trimmed && (
+          <Button size="sm" variant="quiet" onClick={() => setShowLog((v) => !v)}>
+            {showLog ? 'Hide output' : 'Show output'}
+          </Button>
+        )}
+      </div>
+      {showLog && trimmed && (
+        <pre className="telemetry text-bone-4 mt-3 p-3 rounded-lg bg-ink border border-line max-h-56 overflow-auto whitespace-pre-wrap">{trimmed.slice(-2000)}</pre>
+      )}
     </div>
   );
 }
