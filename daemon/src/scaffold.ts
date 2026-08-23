@@ -9,6 +9,7 @@
  */
 
 import { randomBytes, scryptSync } from 'node:crypto';
+import { copyMedia } from './media.ts';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Spec } from '@superbuilds/protocol';
@@ -251,6 +252,11 @@ export async function scaffoldProject(spec: Spec, projectPath: string, onLog: (c
   const lib = designLibraryRoot();
   if (existsSync(join(lib, 'scenes'))) copyTree(join(lib, 'scenes'), join(projectPath, 'components', 'scenes'));
   if (existsSync(join(lib, 'skills'))) copyTree(join(lib, 'skills'), join(projectPath, '.claude', 'skills'));
+
+  if (spec.imagery?.folder && spec.imagery.kind !== 'none') {
+    const copied = copyMedia(spec.imagery.folder, projectPath);
+    say(copied.length ? `Copying ${copied.length} of your own images into public/media` : 'No usable images in that folder — designing without photographs');
+  }
 
   say('Writing design.config.ts, app/fonts.ts and BRIEF.md from your choices');
   writeFileSync(join(projectPath, 'design.config.ts'), designConfigSource(spec));

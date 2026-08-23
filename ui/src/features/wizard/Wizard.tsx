@@ -21,6 +21,9 @@ const STEPS = [
   { id: 'goal', title: 'What should it achieve?', lede: 'The one thing a visitor should end up doing.' },
   { id: 'details', title: 'A few facts', lede: 'All optional. Whatever you give, the site will use; whatever you skip, it will leave honest placeholders for.' },
   { id: 'contents', title: 'What goes in it?', lede: 'Pre-ticked for the kind of business you chose.' },
+  { id: 'belief', title: 'What should they believe by the end?', lede: 'Not a list of features — the one thing a visitor should walk away thinking. It decides what goes where.' },
+  { id: 'signature', title: 'The one thing it does that others do not', lede: 'Every site worth remembering has exactly one. Pick the one that belongs to this business, or let it decide.' },
+  { id: 'pictures', title: 'What pictures are there?', lede: 'Everything a site shows has to come from somewhere. “Nothing yet” is a real answer and a good brief.' },
   { id: 'palette', title: 'Colour', lede: 'Real palettes, checked for contrast. The accent is used as light, not paint.' },
   { id: 'type', title: 'Typography', lede: 'Watch the preview — the hero type changes as you choose.' },
   { id: 'atmosphere', title: 'How should it feel?', lede: 'Not "modern and clean". That is what makes everything look the same.' },
@@ -185,6 +188,53 @@ export function Wizard() {
               </div>
             )}
 
+            {step.id === 'belief' && (
+              <div className="space-y-7">
+                <PickOne
+                  options={catalogue.beliefs[spec.goal ?? 'enquiries'] ?? []}
+                  value={spec.belief}
+                  onChange={(v) => set('belief', spec.belief === v ? undefined : v)}
+                  cols={1}
+                  compact
+                />
+                <Group label="Or say it your own way">
+                  <Input
+                    placeholder="One sentence, in the words you would use"
+                    value={spec.belief && !(catalogue.beliefs[spec.goal ?? 'enquiries'] ?? []).some((b) => b.id === spec.belief) ? spec.belief : ''}
+                    onChange={(e) => set('belief', e.target.value || undefined)}
+                  />
+                </Group>
+                <Group label="Where should it feel calm, and where intense?">
+                  <PickOne options={catalogue.rhythms} value={spec.rhythm} onChange={(v) => set('rhythm', spec.rhythm === v ? undefined : v)} cols={2} compact />
+                </Group>
+              </div>
+            )}
+
+            {step.id === 'signature' && (
+              <div className="space-y-7">
+                <PickOne
+                  options={catalogue.signatures}
+                  value={spec.signature}
+                  onChange={(v) => set('signature', spec.signature === v ? undefined : v)}
+                  cols={2}
+                  compact
+                />
+                <Group label="Or describe it yourself">
+                  <Input
+                    placeholder="“The fire should react when someone moves the mouse”"
+                    value={spec.signature && !catalogue.signatures.some((x) => x.id === spec.signature) ? spec.signature : ''}
+                    onChange={(e) => set('signature', e.target.value || undefined)}
+                  />
+                </Group>
+                <p className="text-[12.5px] text-bone-4 measure">
+                  Whatever this is, it gets built in the first stage and nothing else on the site is
+                  allowed to compete with it. That is what makes it a signature rather than a feature.
+                </p>
+              </div>
+            )}
+
+            {step.id === 'pictures' && <PicturesStep spec={spec} setSpec={setSpec} catalogue={catalogue} />}
+
             {step.id === 'palette' && <PickSwatch options={catalogue.palettes} value={spec.palette} onChange={(v) => set('palette', v)} />}
             {step.id === 'type' && <PickOne options={catalogue.typography} value={spec.typography} onChange={(v) => set('typography', v)} cols={2} compact />}
             {step.id === 'atmosphere' && <PickOne options={catalogue.atmospheres} value={spec.atmosphere} onChange={(v) => set('atmosphere', v)} cols={2} compact />}
@@ -247,6 +297,77 @@ function orderScenes(catalogue: Catalogue, archetype?: string) {
   const fits = catalogue.scenes.filter((s) => s.suits?.includes(archetype ?? ''));
   const rest = catalogue.scenes.filter((s) => !s.suits?.includes(archetype ?? '') && s.id !== 'none');
   return [...fits, ...rest, ...catalogue.scenes.filter((s) => s.id === 'none')];
+}
+
+/**
+ * The imagery question. It is asked here rather than left to the build because
+ * the answer changes the design, not just the assets: a site with no
+ * photographs is not a site with holes in it, it is a site that has to be
+ * built out of type, colour and rule — and deciding that up front is the
+ * difference between a considered page and a grid of empty rectangles.
+ */
+function PicturesStep({ spec, setSpec, catalogue }: { spec: Draft; setSpec: React.Dispatch<React.SetStateAction<Draft>>; catalogue: Catalogue }) {
+  const im = spec.imagery ?? { kind: 'none' as const, instead: [] };
+  const patch = (v: Partial<typeof im>) => setSpec((s) => ({ ...s, imagery: { ...im, ...v } }));
+  const [found, setFound] = useState<{ ok: boolean; count: number; sample: string[]; reason?: string } | null>(null);
+
+  useEffect(() => {
+    if (im.kind === 'none' || !im.folder?.trim()) { setFound(null); return; }
+    const t = setTimeout(() => { api.checkMedia(im.folder!).then(setFound).catch(() => setFound(null)); }, 450);
+    return () => clearTimeout(t);
+  }, [im.kind, im.folder]);
+
+  return (
+    <div className="space-y-7">
+      <PickOne options={catalogue.imageryKinds} value={im.kind} onChange={(v) => patch({ kind: v as typeof im.kind })} cols={1} compact />
+
+      {im.kind !== 'none' && (
+        <div className="space-y-4">
+          <Labelled label="The folder they are in">
+            <Input
+              placeholder="C:\\Users\\you\\Pictures\\the-restaurant"
+              value={im.folder ?? ''}
+              onChange={(e) => patch({ folder: e.target.value })}
+            />
+          </Labelled>
+          {found && !found.ok && <p className="text-[13px] text-danger -mt-2">{found.reason}</p>}
+          {found?.ok && (
+            <p className="text-[13px] text-bone-2 -mt-2 flex items-center gap-2">
+              <Icon name="check" size={13} className="text-volt shrink-0" />
+              {found.count} file{found.count === 1 ? '' : 's'} — <span className="telemetry text-bone-4 truncate">{found.sample.join(', ')}</span>
+            </p>
+          )}
+          <p className="text-[12.5px] text-bone-4 measure -mt-2">
+            Copied into the project when it is built, never uploaded anywhere. JPEG, PNG, WebP,
+            AVIF, SVG, MP4 and WebM, one level deep.
+          </p>
+          <Labelled label="What are they of?">
+            <Input
+              placeholder="The counter at service, the oven, the team"
+              value={im.describes ?? ''}
+              onChange={(e) => patch({ describes: e.target.value })}
+            />
+          </Labelled>
+        </div>
+      )}
+
+      {im.kind !== 'have' && (
+        <Group label={im.kind === 'none' ? 'What goes where a photograph would have gone' : 'And where one is still missing'}>
+          <PickMany
+            options={catalogue.imageryDevices}
+            value={im.instead ?? []}
+            onChange={(v) => patch({ instead: v })}
+            cols={2}
+            compact
+          />
+          <p className="text-[12.5px] text-bone-4 mt-3 measure">
+            Pick none and it will choose per section. What it will never do is leave an empty
+            rounded rectangle or reach for a stock photograph — both are refusals to design.
+          </p>
+        </Group>
+      )}
+    </div>
+  );
 }
 
 function Labelled({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="legend block mb-1.5">{label}</span>{children}</label>; }

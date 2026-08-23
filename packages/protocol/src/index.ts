@@ -129,6 +129,14 @@ export interface Catalogue {
   analytics: Choice[];
   crm: Choice[];
   deploy: Choice[];
+
+  /** The four questions that decide whether a site is memorable, as choices. */
+  signatures: Choice[];
+  rhythms: Choice[];
+  imageryKinds: Choice[];
+  imageryDevices: Choice[];
+  /** Keyed by goal: what a visitor must believe by the end. */
+  beliefs: Record<string, Choice[]>;
 }
 
 /** What was extracted from a reference website. */

@@ -50,6 +50,7 @@ export const api = {
   defaults: (archetype: string) => get<Omit<Spec, 'name' | 'folder'>>(`/api/spec/defaults?archetype=${encodeURIComponent(archetype)}`),
   suggestFolder: (name: string) => get<{ folder: string }>(`/api/folder/suggest?name=${encodeURIComponent(name)}`),
   checkFolder: (path: string) => post<{ ok: boolean; reason?: string }>('/api/folder/check', { path }),
+  checkMedia: (path: string) => post<{ ok: boolean; count: number; sample: string[]; totalBytes: number; reason?: string }>('/api/media/check', { path }),
   plan: (spec: Partial<Spec>) => post<Plan>('/api/plan', spec),
   questions: (spec: Partial<Spec>) => post<{ questions: Question[]; error?: string }>('/api/questions', spec),
   names: (spec: Partial<Spec>) => post<{ names: Array<{ name: string; why?: string }>; error?: string }>('/api/names', spec),

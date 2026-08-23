@@ -18,10 +18,23 @@ import type { Plan, Spec } from '@superbuilds/protocol';
 import {
   ANALYTICS, ATMOSPHERES, CRM, CURSOR_STYLES, FEATURES, GOALS, HERO_RULE, HOVER_STYLES, LAYOUTS, MOTION_INTENSITY,
   PAGES, PALETTES, SCROLL_STYLES, TRANSITIONS, TYPOGRAPHY, archetypeFor, sceneFor,
+  SIGNATURES, RHYTHMS, IMAGERY_DEVICES, beliefsFor,
 } from './catalogue/index.ts';
 import type { Choice } from '@superbuilds/protocol';
 
 const label = (list: Choice[], id: string) => list.find((c) => c.id === id)?.label ?? id;
+
+/**
+ * The intent answers arrive either as a catalogue id (they pressed a card) or
+ * as a sentence (they typed one). Resolve the first, pass the second through,
+ * and include the blurb where it carries the actual instruction.
+ */
+function said(list: Choice[], value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const found = list.find((c) => c.id === value);
+  if (!found) return value;
+  return found.blurb ? `${found.label} — ${found.blurb}` : found.label;
+}
 
 /* ---------------------------------------------------------------------------
    Direction per choice: the part nobody knows to ask for
@@ -171,26 +184,27 @@ export function masterBrief(spec: Spec): string {
 
   say('## The signature move', '',
     spec.signature
-      ? `They asked for this, in their words: "${spec.signature}". Turn it into one interaction, not a theme.`
-      : 'They did not name one, so you decide \u2014 and it must come from this business, not from a library of effects.',
+      ? `They chose: ${said(SIGNATURES, spec.signature)}. Turn it into one interaction that belongs to this business, not a theme.`
+      : 'They did not name one, so you decide — and it must come from this business, not from a library of effects.',
     '',
+    spec.signature === 'decide' ? 'They asked you to choose it. Do, and say plainly which you picked and why it belongs to this business.' : '',
     'Every site this will be compared against has exactly one thing a visitor would screenshot and send to somebody: Lusion has physics you can throw, Bruno Simon has a car you drive around the portfolio, Active Theory has the transition that folds the page. Not five things. One.',
     '',
-    'Decide it now, name it in one sentence in `design.config.ts` under `signature` and in README.md under "The signature move", and build it during the identity stage rather than leaving it for polish. It must be discoverable without instruction \u2014 on scroll or on the first pointer move, never behind a hidden gesture \u2014 it must degrade honestly on a phone and under reduced motion, and nothing else on the site may compete with it.',
+    'Decide it now, name it in one sentence in `design.config.ts` under `signature` and in README.md under "The signature move", and build it during the identity stage rather than leaving it for polish. It must be discoverable without instruction — on scroll or on the first pointer move, never behind a hidden gesture — it must degrade honestly on a phone and under reduced motion, and nothing else on the site may compete with it.',
     '',
     'Read the `scroll-craft` skill before choosing.',
   );
 
   say('## The scroll journey', '',
     spec.belief
-      ? `**What a visitor must believe by the end:** ${spec.belief}`
-      : 'Decide, in one sentence, what a visitor must believe by the end. Not a feature list \u2014 a belief. Write it in README.md.',
+      ? `**What a visitor must believe by the end:** ${said(beliefsFor(spec.goal), spec.belief)}`
+      : 'Decide, in one sentence, what a visitor must believe by the end. Not a feature list — a belief. Write it in README.md.',
     '',
     spec.rhythm
-      ? `**Where it should feel calm and where intense:** ${spec.rhythm}`
-      : '**Rhythm:** the page must breathe \u2014 an intense hero, a calm reading section, an intense chapter, a calm close. Three intense sections in a row read the same as none. Put the intensity where the decision is made.',
+      ? `**Where it should feel calm and where intense:** ${said(RHYTHMS, spec.rhythm)}`
+      : '**Rhythm:** the page must breathe — an intense hero, a calm reading section, an intense chapter, a calm close. Three intense sections in a row read the same as none. Put the intensity where the decision is made.',
     '',
-    'Write the beats in order before any markup: the four to eight things the reader should understand, with the evidence for the belief placed where they decide, not in a footer. Then give each beat a scroll device from `components/ui/Scroll.tsx` \u2014 `Pinned`, `HorizontalTrack`, `Counter`, `Focus`, `Draw`, `Marquee` \u2014 and never the same device twice in a row.',
+    'Write the beats in order before any markup: the four to eight things the reader should understand, with the evidence for the belief placed where they decide, not in a footer. Then give each beat a scroll device from `components/ui/Scroll.tsx` — `Pinned`, `HorizontalTrack`, `Counter`, `Focus`, `Draw`, `Marquee` — and never the same device twice in a row.',
     '',
     'The test for every section: cover the copy and scroll it. If nothing changed except position, it has not earned its scroll. Reveal-on-arrival is the baseline, not a device.',
     '',
@@ -310,7 +324,7 @@ function imageryBrief(spec: Spec): string {
       '',
       'Design with type, colour, rule, real data and the scene. `<Figure>` in `components/ui/Figure.tsx` renders composed plates for exactly this — `type` (one word at 15–25vw, outlined, cropped by its frame; usually the best answer), `field`, `draft` (a measured technical drawing, very strong for products, spaces and processes) and `band`. Pass `seed={i}` across a run so three in a row are not identical.',
     );
-    if (im?.instead?.length) lines.push('', `They picked these devices in particular: ${im.instead.join(', ')}.`);
+    if (im?.instead?.length) lines.push('', `They picked these in particular: ${im.instead.map((d) => said(IMAGERY_DEVICES, d)).join('; ')}.`);
   }
 
   lines.push(
@@ -357,7 +371,7 @@ export const STAGES: StageDef[] = [
       'Every place a picture would go gets a real photograph or a composed `<Figure>` plate — never an empty rounded rectangle, never stock imagery. Read the `imagery` skill.',
       'Write real copy in the voice of the business from the brief: specific, short, no filler. Where a fact is unknown, write an honest placeholder and list it under "Things to confirm" in README.md.',
       'Every form is `<Form name="…">` posting to `/api/forms/[name]` with the right fields and a success state that tells the person it worked. Wire navigation (floating chrome, a menu that is a designed moment, a footer that earns its space), the sitemap, metadata and Open Graph images.',
-      'Run `npm run build`, then `npm run shot -- /<each page>` and look at every screenshot. You are checking three things: the pages belong to the same site as the hero; no section is an empty rectangle; and no form shows an operating-system widget. Forms use `<Form>` \u2014 its select and date fields are the site\'s own controls in the site\'s own locale, so never reach for a raw `<select>` or `<input type="date">`.',
+      'Run `npm run build`, then `npm run shot -- /<each page>` and look at every screenshot. You are checking three things: the pages belong to the same site as the hero; no section is an empty rectangle; and no form shows an operating-system widget. Forms use `<Form>` — its select and date fields are the site\'s own controls in the site\'s own locale, so never reach for a raw `<select>` or `<input type="date">`.',
     ].join('\n'),
   },
   {

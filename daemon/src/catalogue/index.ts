@@ -6,11 +6,13 @@ import {
 } from './design.ts';
 import { SCENES } from './scenes.ts';
 import { ANALYTICS, CRM, DEPLOY } from './integrations.ts';
+import { SIGNATURES, RHYTHMS, IMAGERY_KINDS, IMAGERY_DEVICES, beliefsFor } from './intent.ts';
 
 export { ARCHETYPES, archetypeFor } from './archetypes.ts';
 export * from './design.ts';
 export { SCENES, sceneFor, scenesFor, HERO_RULE } from './scenes.ts';
 export { ANALYTICS, CRM, DEPLOY } from './integrations.ts';
+export * from './intent.ts';
 
 export const CATALOGUE: Catalogue = {
   archetypes: ARCHETYPES,
@@ -31,6 +33,13 @@ export const CATALOGUE: Catalogue = {
   analytics: ANALYTICS,
   crm: CRM,
   deploy: DEPLOY,
+  signatures: SIGNATURES,
+  rhythms: RHYTHMS,
+  imageryKinds: IMAGERY_KINDS,
+  imageryDevices: IMAGERY_DEVICES,
+  // The belief that matters depends on what the site is asking for, so the
+  // wizard narrows this by the chosen goal rather than showing all of them.
+  beliefs: Object.fromEntries(GOALS.map((g) => [g.id, beliefsFor(g.id)])),
 };
 
 /** A complete spec from an archetype, so the wizard opens already answered. */

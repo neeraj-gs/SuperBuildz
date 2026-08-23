@@ -31,6 +31,7 @@ import { deployStatus, vercelLogin, deployProject, setEnvValue } from './deploy.
 import { judge, hookResponse } from './policy.ts';
 import { tweakState, setTweaks, shufflePalette } from './tweaks.ts';
 import { proposeDirections, readDirections, chooseDirection } from './directions.ts';
+import { checkMediaFolder } from './media.ts';
 import { superbuildsHome, uiDist } from './paths.ts';
 
 const PORT = Number(process.env.SUPERBUILDS_PORT ?? 7747);
@@ -114,6 +115,9 @@ app.get('/api/changes', async () => CHANGES);
 app.get('/api/spec/defaults', async (req) => defaultsFor(String((req.query as { archetype?: string }).archetype ?? 'other')));
 app.get('/api/folder/suggest', async (req) => ({ folder: folderFor(String((req.query as { name?: string }).name ?? 'site')) }));
 app.post('/api/folder/check', async (req) => folderIsUsable(String((req.body as { path?: string })?.path ?? '')));
+// A folder of photographs is not a project folder: it exists, it is not empty,
+// and what matters is what is in it.
+app.post('/api/media/check', async (req) => checkMediaFolder(String((req.body as { path?: string })?.path ?? '')));
 app.post('/api/plan', async (req) => planFor(completeSpec((req.body ?? {}) as Partial<Spec>)));
 app.post('/api/questions', async (req, reply) => {
   const spec = completeSpec((req.body ?? {}) as Partial<Spec>);

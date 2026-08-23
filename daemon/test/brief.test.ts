@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { completeSpec, CATALOGUE, defaultsFor, ARCHETYPES, SCENES, PALETTES } from '../src/catalogue/index.ts';
+import * as CATALOGUE_INTENT from '../src/catalogue/intent.ts';
 import { masterBrief, planFor, stagesFor, systemPromptFor, changeBrief, sceneComponent, TYPE_DIRECTION, CHANGES } from '../src/brief.ts';
 import { designConfigSource, fontsSource, hashPassword, localeFor } from '../src/scaffold.ts';
 
@@ -187,4 +188,42 @@ test('tweaks are sanitised before they are written into somebody\'s project', as
   assert.deepEqual(sanitise({ grain: 99 }), { grain: 0.3 }, 'out of range is clamped, not refused');
   assert.deepEqual(sanitise({ pace: -5 }), { pace: 0.4 });
   assert.deepEqual(sanitise({ radius: Number.NaN }), {});
+});
+
+test('intent answers reach the brief as prose, whether pressed or typed', () => {
+  const pressed = masterBrief(completeSpec({
+    ...defaultsFor('restaurant'), name: 'Ember', folder: '', goal: 'bookings',
+    signature: 'subject-responds', belief: 'worth-the-trip', rhythm: 'slow-build',
+    imagery: { kind: 'none', instead: ['type', 'draft'] },
+  }));
+  // Ids must never survive into the brief: "subject-responds" is not an instruction.
+  assert.doesNotMatch(pressed, /subject-responds|worth-the-trip|slow-build/);
+  assert.match(pressed, /The subject answers the pointer/);
+  assert.match(pressed, /worth going out of my way for/);
+  assert.match(pressed, /most intense at the end/);
+  assert.match(pressed, /One word, enormous/);
+  assert.match(pressed, /measured drawing/i);
+
+  const typed = masterBrief(completeSpec({
+    ...defaultsFor('restaurant'), name: 'Ember', folder: '',
+    signature: 'the fire should react to the pointer', belief: 'that we take fire seriously',
+  }));
+  assert.match(typed, /the fire should react to the pointer/);
+  assert.match(typed, /that we take fire seriously/);
+});
+
+test('every intent choice is answerable and nothing is a dangling id', () => {
+  const { SIGNATURES, RHYTHMS, IMAGERY_KINDS, IMAGERY_DEVICES, beliefsFor } = CATALOGUE_INTENT;
+  for (const list of [SIGNATURES, RHYTHMS, IMAGERY_KINDS, IMAGERY_DEVICES]) {
+    assert.ok(list.length >= 3, 'a choice of two is barely a choice');
+    for (const c of list) {
+      assert.match(c.id, /^[a-z][a-z0-9-]*$/, c.id);
+      assert.ok(c.label.length > 3, c.id);
+    }
+  }
+  for (const g of CATALOGUE.goals) {
+    assert.ok(beliefsFor(g.id).length >= 4, `${g.id} needs beliefs to offer`);
+  }
+  // The wizard's imagery kinds have to match the three the Spec allows.
+  assert.deepEqual(IMAGERY_KINDS.map((k) => k.id).sort(), ['have', 'none', 'some']);
 });
