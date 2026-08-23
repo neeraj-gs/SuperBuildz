@@ -22,8 +22,13 @@
 }
 
 html { scroll-behavior: auto; }
+/*
+  The scene is a fixed layer beneath the whole document, so `body` is
+  transparent and the ground colour is painted by the layer. A page with no
+  scene sets `--bg` on `.scene-layer` and looks identical.
+*/
 body {
-  background: var(--bg);
+  background: transparent;
   color: var(--fg);
   font-family: var(--font-body);
   font-size: var(--body-size);
@@ -39,6 +44,12 @@ body {
 .eyebrow { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: color-mix(in srgb, var(--fg) 60%, var(--bg)); }
 .measure { max-width: var(--measure); }
 .container-x { padding-left: var(--gutter); padding-right: var(--gutter); }
+
+/* Content composites over the scene layer. */
+.scene-layer { z-index: 0; }
+main, header, footer { position: relative; z-index: 1; }
+/* A section that needs to be read paints its own ground over the scene. */
+.section[data-scene-dim] { background: color-mix(in oklab, var(--bg) 88%, transparent); }
 .section { padding-top: var(--section); padding-bottom: var(--section); }
 .hairline { border-color: var(--line); }
 

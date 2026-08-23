@@ -2,8 +2,15 @@
 
 import { useRef, useState, type FormEvent } from 'react';
 import { track } from '@/lib/analytics';
+import { Select, DateField } from '@/components/ui/Controls';
 
-export interface FieldDef { name: string; label: string; type?: 'text' | 'email' | 'tel' | 'textarea' | 'select' | 'date' | 'number'; required?: boolean; options?: string[]; placeholder?: string }
+export interface FieldDef {
+  name: string; label: string;
+  type?: 'text' | 'email' | 'tel' | 'textarea' | 'select' | 'date' | 'time' | 'number';
+  required?: boolean; options?: string[]; placeholder?: string;
+  /** Dates only: the earliest selectable day, and days the business is closed (0 = Sunday). */
+  min?: string; max?: string; closedDays?: number[];
+}
 
 /**
  * Every form on the site. Posts to /api/forms/[name], which validates,
@@ -38,9 +45,13 @@ export function Form({ name, fields, submitLabel = 'Send', success = 'Thank you.
           {f.type === 'textarea' ? (
             <textarea name={f.name} required={f.required} placeholder={f.placeholder} rows={4} className="w-full rounded-[var(--radius)] border hairline bg-surface px-4 py-3 outline-none focus:border-accent transition-colors" />
           ) : f.type === 'select' ? (
-            <select name={f.name} required={f.required} className="h-12 rounded-[var(--radius)] border hairline bg-surface px-4 outline-none focus:border-accent">
-              <option value="">Choose…</option>{(f.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
-            </select>
+            // Never a native <select>: it renders the operating system's widget
+            // in the middle of the one moment the visitor is committing.
+            <Select name={f.name} options={f.options ?? []} required={f.required} placeholder={f.placeholder ?? 'Choose'} />
+          ) : f.type === 'date' ? (
+            // Never a native date input either: it shows the *operating
+            // system's* locale, so a Lisbon booking form asks for mm/dd/yyyy.
+            <DateField name={f.name} required={f.required} placeholder={f.placeholder ?? 'Pick a date'} min={f.min} max={f.max} disabledDays={f.closedDays} />
           ) : (
             <input name={f.name} type={f.type ?? 'text'} required={f.required} placeholder={f.placeholder} className="h-12 rounded-[var(--radius)] border hairline bg-surface px-4 outline-none focus:border-accent transition-colors" />
           )}

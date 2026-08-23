@@ -1,8 +1,15 @@
 'use client';
 
 /**
- * The hero scene's contract, kept here so the scene itself can be swapped or
- * adapted without touching any of this:
+ * One framed scene, in a box.
+ *
+ * Prefer `<SceneLayer />` — a single canvas under the whole document — for the
+ * site's main scene; a canvas that ends at the fold is what separates a good
+ * dark page from an experience. This is for the cases where a scene genuinely
+ * belongs inside one frame: a product on a detail page, a stage in a
+ * split-stage layout, a card that happens to be 3D.
+ *
+ * The contract, either way:
  *
  *  - lazy: the WebGL bundle loads after first paint, behind a designed poster
  *  - pixel ratio capped at 2, lower on heavy scenes on small screens
@@ -16,22 +23,8 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ComponentTyp
 import { design } from '@/design.config';
 import type { SceneProps } from '@/components/scenes/_shared';
 import { paletteFor, type Theme } from '@/lib/tokens';
+import { SCENE_LOADERS } from '@/components/scenes/loaders';
 
-const loaders: Record<string, () => Promise<{ default: ComponentType<SceneProps> }>> = {
-  TypeScene: () => import('@/components/scenes/TypeScene').then((m) => ({ default: m.TypeScene })),
-  FieldScene: () => import('@/components/scenes/FieldScene').then((m) => ({ default: m.FieldScene })),
-  ReliefScene: () => import('@/components/scenes/ReliefScene').then((m) => ({ default: m.ReliefScene })),
-  WordmarkScene: () => import('@/components/scenes/WordmarkScene').then((m) => ({ default: m.WordmarkScene })),
-  ObjectScene: () => import('@/components/scenes/ObjectScene').then((m) => ({ default: m.ObjectScene })),
-  LiquidScene: () => import('@/components/scenes/LiquidScene').then((m) => ({ default: m.LiquidScene })),
-  DioramaScene: () => import('@/components/scenes/DioramaScene').then((m) => ({ default: m.DioramaScene })),
-  ClothScene: () => import('@/components/scenes/ClothScene').then((m) => ({ default: m.ClothScene })),
-  TerrainScene: () => import('@/components/scenes/TerrainScene').then((m) => ({ default: m.TerrainScene })),
-  MorphScene: () => import('@/components/scenes/MorphScene').then((m) => ({ default: m.MorphScene })),
-  GlassScene: () => import('@/components/scenes/GlassScene').then((m) => ({ default: m.GlassScene })),
-  ExplodedScene: () => import('@/components/scenes/ExplodedScene').then((m) => ({ default: m.ExplodedScene })),
-  RibbonsScene: () => import('@/components/scenes/RibbonsScene').then((m) => ({ default: m.RibbonsScene })),
-};
 
 export function SceneCanvas({ component = design.scene.component, className, name = design.name, poster = '/scene-poster.svg', progressSource = 'page' }: {
   component?: string; className?: string; name?: string; poster?: string; progressSource?: 'page' | 'none';
@@ -44,7 +37,7 @@ export function SceneCanvas({ component = design.scene.component, className, nam
   const host = useRef<HTMLDivElement>(null);
   const progress = useRef(0);
   const pointer = useRef<[number, number]>([0, 0]);
-  const Scene = useMemo(() => lazy(loaders[component] ?? loaders.FieldScene), [component]);
+  const Scene = useMemo(() => lazy(SCENE_LOADERS[component] ?? SCENE_LOADERS.FieldScene), [component]);
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');

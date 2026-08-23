@@ -10,9 +10,12 @@ and it outranks taste. Skills with reference knowledge live in `.claude/skills/`
 | --- | --- | --- |
 | Colour, type, radius, spacing, motion values | `design.config.ts` | The only place. Components read tokens via CSS variables set in `lib/tokens.ts`. |
 | Fonts | `app/fonts.ts` | `next/font/google`, written by Super Builds for the chosen typography. |
-| The hero scene | `components/scenes/<Scene>.tsx` + `components/SceneCanvas.tsx` | Adapt the scene to the business; keep the SceneCanvas contract (poster, lazy, DPR cap, reduced motion, pause off-screen). |
+| The scene | `components/scenes/<Scene>.tsx` + `components/SceneLayer.tsx` | **One canvas under the whole document**, mounted in `app/layout.tsx`. Sections drive it with `data-scene-frame` / `data-scene-dim` (the `Section` component's `frame` and `dim` props). The scene receives `portrait` below 720px and must *recompose*, not shrink. `SceneCanvas` is the exception, for a scene that genuinely lives inside one frame. |
 | Pages | `app/**/page.tsx` | App Router. Server Components by default; `'use client'` only where there is interaction. |
 | Shared UI | `components/ui/` | `Nav` (floating chrome), `Footer`, `Button`, `Section`, `Form`, `Reveal`, `Cursor`, `SmoothScroll`, `PageTransition`, `ThemeToggle`. |
+| Scroll devices | `components/ui/Scroll.tsx` | `Pinned`, `HorizontalTrack`, `Counter`, `Focus`, `Draw`, `Marquee`. Compose these; do not re-derive ScrollTrigger. Every section earns its scroll. |
+| Pictures | `components/ui/Figure.tsx` | A real photograph, or a *composed* plate (`type` / `field` / `draft` / `band`). Never an empty rounded rectangle, never stock. |
+| Form controls | `components/ui/Controls.tsx` | `Select` and `DateField`. Never a native `<select>` or `<input type="date">`: they render the OS widget in the OS locale. |
 | Analytics | `lib/analytics.ts` (`track()`), `lib/analytics-client.tsx` (providers) | Every event goes through `track()`. Funnel events are named in BRIEF.md. |
 | Forms | `<Form name="…">` → `app/api/forms/[form]/route.ts` | Validated with zod, rate-limited, honeypot. Lands as a lead + activity. |
 | CRM | `app/admin/**` | Login in `app/admin/login`, auth in `lib/auth.ts`. Pipeline stages in `db/pipeline.ts`, KPIs in `app/admin/kpis.ts`. It wears the site's tokens — check it after restyling. |
@@ -43,6 +46,12 @@ npm run test:forms         # post a test lead through the real form route
   README.md under "Things to confirm".
 - The hero is an experience, not a layout. The motion system recurs. No
   AI-slop gradients, glass cards, orbs or stock grids. See BRIEF.md's rubric.
+- The scene is alive for the whole page, not just the hero.
+- Every section earns its scroll: cover the copy, scroll it, and if nothing
+  changed but position it is a slide, not a section. Read `scroll-craft`.
+- Nowhere renders an empty rounded rectangle. Read `imagery`.
+- The site has exactly one signature move, named in `design.config.ts` and
+  README.md, and nothing competes with it.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

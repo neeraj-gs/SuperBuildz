@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { completeSpec, CATALOGUE, defaultsFor, ARCHETYPES, SCENES, PALETTES } from '../src/catalogue/index.ts';
 import { masterBrief, planFor, stagesFor, systemPromptFor, changeBrief, sceneComponent, TYPE_DIRECTION, CHANGES } from '../src/brief.ts';
-import { designConfigSource, fontsSource, hashPassword } from '../src/scaffold.ts';
+import { designConfigSource, fontsSource, hashPassword, localeFor } from '../src/scaffold.ts';
 
 test('every archetype default points at real catalogue entries', () => {
   for (const a of ARCHETYPES) {
@@ -93,4 +93,67 @@ test('password hashes carry their parameters', () => {
   assert.match(h, /^scrypt:32768:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/);
   assert.ok(!h.includes('$'), 'no $ — Next expands it in .env files');
   assert.notEqual(hashPassword('correct horse'), h);
+});
+
+/* ---------------------------------------------------------------------------
+   The five things a generated site got wrong last time. Each of them is now a
+   line in the brief, and a line in the brief that quietly stops being emitted
+   is the kind of regression nobody notices until a build ships without it.
+--------------------------------------------------------------------------- */
+
+test('the brief demands a signature move, a scroll journey and a page-wide scene', () => {
+  const spec = completeSpec({ ...defaultsFor('restaurant'), name: 'Ember & Oak', folder: '' });
+  const brief = masterBrief(spec);
+  assert.match(brief, /## The signature move/);
+  assert.match(brief, /## The scroll journey/);
+  assert.match(brief, /SceneLayer/, 'the scene must be mounted page-wide, not inside the hero');
+  assert.match(brief, /data-scene-frame/);
+  assert.match(brief, /portrait/i, 'portrait is a different composition, not a narrower one');
+  assert.match(brief, /earned its scroll/);
+});
+
+test('the brief answers the imagery question, and forbids the empty rectangle', () => {
+  const none = masterBrief(completeSpec({ ...defaultsFor('portfolio'), name: 'Studio', folder: '' }));
+  assert.match(none, /## The pictures/);
+  assert.match(none, /never render an empty rounded rectangle/i);
+  assert.match(none, /Unsplash/, 'stock photography has to be named to be refused');
+  assert.match(none, /<Figure>/);
+
+  const have = masterBrief(completeSpec({
+    ...defaultsFor('restaurant'), name: 'Ember', folder: '',
+    imagery: { kind: 'have', folder: 'C:/photos', describes: 'the counter at service', instead: [] },
+  }));
+  assert.match(have, /public\/media/);
+  assert.match(have, /the counter at service/);
+  assert.doesNotMatch(have, /There are no photographs/);
+});
+
+test('the rubric covers what the last build missed', () => {
+  const brief = masterBrief(completeSpec({ ...defaultsFor('other'), name: 'X', folder: '' }));
+  for (const line of [/alive for the whole page/, /earns its scroll/, /signature move/, /No empty rectangles/, /native select or date input/]) {
+    assert.match(brief, line, String(line));
+  }
+});
+
+test('a location becomes a locale, and an unknown one is not American', () => {
+  assert.equal(localeFor('Lisbon, Portugal'), 'pt-PT');
+  assert.equal(localeFor('Brooklyn, New York'), 'en-US');
+  assert.equal(localeFor('Manchester'), 'en-GB');
+  assert.equal(localeFor(undefined), 'en-GB');
+  assert.equal(localeFor('somewhere nobody listed'), 'en-GB');
+  // It has to reach design.config.ts, or the date picker cannot use it.
+  const src = designConfigSource(completeSpec({ ...defaultsFor('restaurant'), name: 'E', folder: '', details: { location: 'Lisbon' }, signature: 'the fire answers the pointer' }));
+  assert.match(src, /locale: "pt-PT"/);
+  assert.match(src, /signature: "the fire answers the pointer"/);
+});
+
+test('the review stage is on by default and knows what to look for', () => {
+  assert.equal(completeSpec({ name: 'A', folder: '' }).review, true);
+  const review = stagesFor(completeSpec({ name: 'A', folder: '' })).find((s) => s.id === 'review');
+  assert.ok(review, 'the jury stage must exist by default');
+  const prompt = review!.prompt(completeSpec({ name: 'A', folder: '' }));
+  assert.match(prompt, /dies after the first viewport/);
+  assert.match(prompt, /empty rounded rectangles/);
+  assert.match(prompt, /mm\/dd\/yyyy/);
+  assert.match(prompt, /cropped out of frame at 390px/);
 });

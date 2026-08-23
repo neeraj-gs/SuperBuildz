@@ -8,6 +8,7 @@ import { SmoothScroll } from '@/components/ui/SmoothScroll';
 import { Cursor } from '@/components/ui/Cursor';
 import { PageTransition } from '@/components/ui/PageTransition';
 import { ThemeScript } from '@/components/ui/ThemeToggle';
+import { SceneLayer, SceneContent } from '@/components/SceneLayer';
 
 export const metadata: Metadata = {
   title: { default: design.name, template: `%s — ${design.name}` },
@@ -23,7 +24,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head><ThemeScript /></head>
       <body>
         <SmoothScroll />
-        <PageTransition>{children}</PageTransition>
+        {/*
+          One canvas, beneath the whole document. Sections tell it what to do
+          with `data-scene-frame`. A scene that stops at the fold is the
+          clearest difference between a good dark page and an experience.
+        */}
+        <SceneLayer />
+        <SceneContent>
+          <PageTransition>{children}</PageTransition>
+        </SceneContent>
         <Cursor />
         <AnalyticsProviders />
       </body>

@@ -8,6 +8,8 @@
 export const design = {
   name: 'Your Site',
   archetype: 'other',
+  /** BCP-47. Every date, time and number on the site is formatted against it. */
+  locale: 'en-GB',
   theme: 'dark' as 'dark' | 'light' | 'both',
   palette: {
     id: 'ink',
@@ -30,6 +32,8 @@ export const design = {
     bodyLeading: '1.65',
     measure: '66ch',
   },
+  /** The one interaction this site has that nothing else competes with. */
+  signature: '',
   shape: { radius: '8px', radiusLg: '16px', hairline: '1px' },
   space: { section: 'clamp(5rem, 14vh, 11rem)', gutter: 'clamp(1rem, 3vw, 2.5rem)' },
   motion: {

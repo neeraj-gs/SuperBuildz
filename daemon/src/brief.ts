@@ -169,10 +169,44 @@ export function masterBrief(spec: Spec): string {
     'Before anything else, decide the one idea the whole site commits to — the sentence a visitor would use to describe it to a friend. It must come from the business, not from the template. Write it at the top of README.md under "The idea" and make every later decision serve it. A site with a competent everything and no idea is the failure mode; a site with one strong idea and some rough edges is the success.',
   );
 
+  say('## The signature move', '',
+    spec.signature
+      ? `They asked for this, in their words: "${spec.signature}". Turn it into one interaction, not a theme.`
+      : 'They did not name one, so you decide \u2014 and it must come from this business, not from a library of effects.',
+    '',
+    'Every site this will be compared against has exactly one thing a visitor would screenshot and send to somebody: Lusion has physics you can throw, Bruno Simon has a car you drive around the portfolio, Active Theory has the transition that folds the page. Not five things. One.',
+    '',
+    'Decide it now, name it in one sentence in `design.config.ts` under `signature` and in README.md under "The signature move", and build it during the identity stage rather than leaving it for polish. It must be discoverable without instruction \u2014 on scroll or on the first pointer move, never behind a hidden gesture \u2014 it must degrade honestly on a phone and under reduced motion, and nothing else on the site may compete with it.',
+    '',
+    'Read the `scroll-craft` skill before choosing.',
+  );
+
+  say('## The scroll journey', '',
+    spec.belief
+      ? `**What a visitor must believe by the end:** ${spec.belief}`
+      : 'Decide, in one sentence, what a visitor must believe by the end. Not a feature list \u2014 a belief. Write it in README.md.',
+    '',
+    spec.rhythm
+      ? `**Where it should feel calm and where intense:** ${spec.rhythm}`
+      : '**Rhythm:** the page must breathe \u2014 an intense hero, a calm reading section, an intense chapter, a calm close. Three intense sections in a row read the same as none. Put the intensity where the decision is made.',
+    '',
+    'Write the beats in order before any markup: the four to eight things the reader should understand, with the evidence for the belief placed where they decide, not in a footer. Then give each beat a scroll device from `components/ui/Scroll.tsx` \u2014 `Pinned`, `HorizontalTrack`, `Counter`, `Focus`, `Draw`, `Marquee` \u2014 and never the same device twice in a row.',
+    '',
+    'The test for every section: cover the copy and scroll it. If nothing changed except position, it has not earned its scroll. Reveal-on-arrival is the baseline, not a device.',
+    '',
+    'Pace it. The commonest failure is a sequence that plays out in 300px of scroll, so the reader sees a flicker rather than a change. Pinned sequences want two to three viewport heights. Check by screenshotting four points through each one and looking at them.',
+  );
+
   say(HERO_RULE);
 
   say(`## The scene: ${scene.label}`, '', scene.brief, '', `**Adapt it to this business:** ${scene.adapt}`, '',
-    'The scene already exists as working code in `components/scenes/` — the same component the person previewed while choosing. Start from it. Change its geometry, material, palette behaviour and what it responds to so it belongs to this business and no other. Keep its performance contract: lazy-loaded behind the designed poster in `SceneCanvas`, pixel ratio capped at 2, paused when off screen or the tab is hidden, a still composition under prefers-reduced-motion or without WebGL.',
+    'The scene already exists as working code in `components/scenes/` — the same component the person previewed while choosing. Start from it. Change its geometry, material, palette behaviour and what it responds to so it belongs to this business and no other.',
+    '',
+    '**It does not stop at the fold.** Mount it with `<SceneLayer />` in the root layout, not `<SceneCanvas />` inside the hero: one fixed canvas beneath the whole document, with page content composited over it through `<SceneContent>`. Sections tell the scene what to do while they are on screen with `data-scene-frame="n"`, and dim it where they need to be read with `data-scene-dim="0.6"`. A canvas that dies after 100vh is the clearest single difference between a good dark page and an experience, and it is the thing every reference site does.',
+    '',
+    '**Portrait is a different composition, not a narrower one.** The scene receives `portrait` (true below 720px). Use it to move the camera, re-centre the subject and drop background elements. Shrinking a landscape composition crops the subject out of frame, which is how a strong hero becomes meaningless on a phone — check it by screenshotting at 390px and looking at the result.',
+    '',
+    'Keep the performance contract: lazy behind the designed poster, pixel ratio capped at 2, paused when the tab is hidden, a still composition under prefers-reduced-motion or without WebGL.',
   );
 
   say('## How it looks', '',
@@ -216,11 +250,12 @@ export function masterBrief(spec: Spec): string {
     `Instrument the funnel with exactly these event names through \`track()\`: ${funnel.join(', ')}. Plus \`section_view\` with the section id, \`scroll_depth\` at 25/50/75/100, \`cta_click\` with the label. Nothing else fires by default.`,
   );
 
+  say('## The pictures', '', imageryBrief(spec));
+
   say('## Performance, accessibility, honesty', '',
     '- Budget: Lighthouse Performance ≥ 85 on mobile with the scene lazy-loaded behind its poster; LCP under 2.5s; the WebGL bundle under 180KB gzipped; images via `next/image` at real sizes; fonts subset.',
     '- Keyboard reachable, visible focus, real contrast, semantic landmarks, alt text that describes.',
     '- Never invent testimonials, reviews, numbers, awards, clients or addresses. Where real content is missing, write honest placeholder copy in the voice of the business and mark it with `<!-- TODO: confirm -->` in the source and a checklist in README.md under "Things to confirm".',
-    '- No stock-photo grids. If imagery is missing, design with type, colour and the scene.',
     '- Keep `/admin` out of `robots.txt`, keep every secret server-only, keep the security headers in `next.config.ts`.',
   );
 
@@ -241,8 +276,54 @@ export const RUBRIC = [
   '9. **Forms work end to end** and land in the CRM with the right stage; the CRM wears the site\'s tokens.',
   '10. **Performance and access**: reduced-motion, lazy WebGL with poster, budgets met, keyboard and contrast.',
   '11. **Security intact**: headers, validation, rate limit, admin auth, no secret client-side.',
-  '12. **Mobile is designed, not shrunk**: the hero still works at 390px, pins released, horizontal tracks fall back.',
+  '12. **Mobile is designed, not shrunk**: the hero still works at 390px, the scene is recomposed for portrait rather than cropped, pins released, horizontal tracks fall back.',
+  '13. **The scene is alive for the whole page**, not only the hero — mounted as a layer, following the chapters, dimmed where reading happens.',
+  '14. **Every section earns its scroll.** Cover the copy and scroll it: if nothing changed but position, it fails. Sequences paced slowly enough to read.',
+  '15. **A signature move**, named in design.config.ts and README, discoverable without instruction, with nothing competing with it.',
+  '16. **No empty rectangles.** Everywhere a photograph would go holds either a real photograph or a composed plate. No stock imagery, no grey boxes, no dashed outlines.',
+  '17. **Controls belong to the site**: no native select or date input anywhere, and dates, times and numbers in the business own locale.',
 ].join('\n');
+
+/* ---------------------------------------------------------------------------
+   What to do about the pictures — the answer that most often decides
+   whether a finished site reads as finished.
+--------------------------------------------------------------------------- */
+
+function imageryBrief(spec: Spec): string {
+  const im = spec.imagery;
+  const lines: string[] = [];
+
+  if (im?.kind === 'have' || im?.kind === 'some') {
+    lines.push(
+      im.folder
+        ? `Photographs were provided and copied into \`public/media/\`, and are listed in README.md under "Assets".${im.describes ? ` They are of: ${im.describes}.` : ''}`
+        : `They say they have photographs${im.describes ? ` — ${im.describes}` : ''} but have not supplied them yet.`,
+      '',
+      'Use them through `next/image` with real `sizes`, crop them deliberately rather than dropping them into a box, and caption them in small caps saying what the thing is. One image carrying a section beats four sharing it. Never upscale a small file into a full-bleed hero.',
+    );
+    if (im.kind === 'some') {
+      lines.push('', 'Where a photograph is still missing, use `<Figure>` with no `src` at exactly the aspect ratio the real one will occupy, so nothing moves when it arrives — and list the shot that is needed in README.md under "Things to confirm", described well enough for them to go and take it.');
+    }
+  } else {
+    lines.push(
+      'There are no photographs, and there will not be any. That is a design brief, not a limitation: several of the sites this will be compared against have almost none.',
+      '',
+      'Design with type, colour, rule, real data and the scene. `<Figure>` in `components/ui/Figure.tsx` renders composed plates for exactly this — `type` (one word at 15–25vw, outlined, cropped by its frame; usually the best answer), `field`, `draft` (a measured technical drawing, very strong for products, spaces and processes) and `band`. Pass `seed={i}` across a run so three in a row are not identical.',
+    );
+    if (im?.instead?.length) lines.push('', `They picked these devices in particular: ${im.instead.join(', ')}.`);
+  }
+
+  lines.push(
+    '',
+    '**The rule, either way: never render an empty rounded rectangle.** A grey box with a number in the corner, a `bg-surface` div with an aspect ratio and nothing inside it, a dashed outline saying "image" — that is the single most common reason a generated site reads as unfinished. If you are about to write a div whose only content is its own dimensions, use `<Figure>` instead.',
+    '',
+    '**And no stock photography.** No Unsplash, no Pexels, no offices, handshakes or laptops, nothing hotlinked. It reads as generated precisely because it is generic. Never invent a photograph of the owner, the premises, the team or a client, and never a logo wall of clients who have not been named.',
+    '',
+    'Read the `imagery` skill before building any section that wants a picture.',
+  );
+
+  return lines.join('\n');
+}
 
 /* ---------------------------------------------------------------------------
    Stages
@@ -257,12 +338,13 @@ export const STAGES: StageDef[] = [
     id: 'identity', label: 'Identity and hero', blurb: 'Tokens, type, the organising idea, the scene adapted to the business',
     prompt: (spec) => [
       `Stage 1 of ${spec.review ? 5 : 4}: identity and the hero.`, '', PREAMBLE, '',
-      '1. Decide the organising idea. Write it in README.md under "The idea" in two sentences.',
+      '1. Decide the organising idea and the signature move. Write both in README.md — "The idea" in two sentences, "The signature move" in one — and put the signature into `design.config.ts` under `signature`. Read the `scroll-craft` skill first.',
       '2. Tune `design.config.ts`: keep the palette, set the type scale, radius, spacing rhythm and the motion values (durations, eases, the named gesture) so they match the atmosphere in the brief.',
       `3. Adapt the chosen scene (\`components/scenes/${sceneComponent(spec.scene)}.tsx\`) to this business exactly as the brief asks: geometry, material, what it responds to, what it means. Keep the SceneCanvas contract (poster, lazy, reduced motion, DPR cap, pause off-screen).`,
-      '4. Build the home page hero so it clears the hero rule: full viewport, floating chrome, type as part of the composition, something moving before any interaction.',
-      '5. Design the poster still for the scene (`public/scene-poster.svg` or a rendered PNG) so the page is designed before WebGL loads.',
-      '6. Run `npm run build`. Then take a screenshot: run `npm run shot -- /` and look at `shots/home.png` with the Read tool. If the hero does not clear the rule, fix it before finishing.',
+      '4. Mount the scene page-wide: `<SceneLayer />` in `app/layout.tsx` with the page inside `<SceneContent>`, not `<SceneCanvas />` inside the hero. The canvas must be alive under the whole document, following `data-scene-frame` on each section.',
+      '5. Build the home page hero so it clears the hero rule: full viewport, floating chrome, type as part of the composition, something moving before any interaction. Build the signature move here too — it is not polish, it is the thing the site is remembered for.',
+      '6. Design the poster still for the scene (`public/scene-poster.svg` or a rendered PNG) so the page is designed before WebGL loads.',
+      '7. Run `npm run build`. Then screenshot the home page at both sizes: `npm run shot -- /` and `npm run shot -- / --mobile`, and look at both with the Read tool. Desktop: does the hero clear the rule? Mobile: is the *subject* of the scene still in frame, or has a landscape composition been cropped until it means nothing? Recompose for `portrait` rather than shrinking. Fix both before finishing.',
     ].join('\n'),
   },
   {
@@ -271,9 +353,11 @@ export const STAGES: StageDef[] = [
       `Stage 2 of ${spec.review ? 5 : 4}: every page.`, '', PREAMBLE, '',
       `Build these pages, in the layout system the brief names: ${spec.pages.map((p) => label(PAGES, p)).join(', ')}.`,
       `Features to include: ${spec.features.map((f) => label(FEATURES, f)).join(', ') || 'none beyond the pages'}.`,
+      'Before writing any markup, write the beats of the home page in order in README.md under "The journey" — the four to eight things a reader should understand, and where the evidence for the belief sits. Then give each beat a scroll device from `components/ui/Scroll.tsx` (`Pinned`, `HorizontalTrack`, `Counter`, `Focus`, `Draw`, `Marquee`), never the same one twice in a row, and mark each section with `data-scene-frame` so the scene follows the story. Reveal-on-arrival is the baseline, not a device: a page whose only motion is things fading in has not earned its scroll.',
+      'Every place a picture would go gets a real photograph or a composed `<Figure>` plate — never an empty rounded rectangle, never stock imagery. Read the `imagery` skill.',
       'Write real copy in the voice of the business from the brief: specific, short, no filler. Where a fact is unknown, write an honest placeholder and list it under "Things to confirm" in README.md.',
       'Every form is `<Form name="…">` posting to `/api/forms/[name]` with the right fields and a success state that tells the person it worked. Wire navigation (floating chrome, a menu that is a designed moment, a footer that earns its space), the sitemap, metadata and Open Graph images.',
-      'Run `npm run build`, then `npm run shot -- /<each page>` and look at two of the screenshots to check the pages belong to the same site as the hero.',
+      'Run `npm run build`, then `npm run shot -- /<each page>` and look at every screenshot. You are checking three things: the pages belong to the same site as the hero; no section is an empty rectangle; and no form shows an operating-system widget. Forms use `<Form>` \u2014 its select and date fields are the site\'s own controls in the site\'s own locale, so never reach for a raw `<select>` or `<input type="date">`.',
     ].join('\n'),
   },
   {
@@ -281,6 +365,8 @@ export const STAGES: StageDef[] = [
     prompt: (spec) => [
       `Stage 3 of ${spec.review ? 5 : 4}: the motion system.`, '', PREAMBLE, '',
       'Implement the scroll style, hover style, cursor and page transition exactly as the brief describes, using the values in `design.config.ts` → `motion` and nothing else. Make the hero\'s gesture recur: the same ease and direction in section reveals, the accent behaving the same way on hover as it does in the scene.',
+      'Then pace it. Run `npm run shot -- / --scroll` and look at all six frames in order. Two adjacent frames that are identical mean a section is not earning its scroll; a sequence that resolves entirely between two frames is too fast: if the reader cannot stop halfway and understand what they are seeing, the sequence is too fast — pinned sequences want two to three viewport heights, not one. The commonest complaint about work like this is that it plays out in a flick of the trackpad.',
+      'Make the page breathe. If three sections in a row are intense, none of them stands out; put the intensity where the decision is made and let the reading sections be calm.',
       'Check every pinned or scrubbed section on a 390px viewport (`npm run shot -- / --mobile`), release pins there if the brief says so, and make sure `prefers-reduced-motion` turns everything into a fade or nothing — test by setting it in the shot script (`--reduced`).',
       'Run `npm run build`.',
     ].join('\n'),
@@ -300,7 +386,9 @@ export const STAGES: StageDef[] = [
     id: 'review', label: 'Award jury', blurb: 'Score against the rubric; fix what fails',
     prompt: () => [
       'Stage 5 of 5: the review.', '', PREAMBLE, '',
-      'You are now the jury. Take fresh screenshots of every page at desktop and 390px (`npm run shot -- --all`) and read them. Score the site 1–5 against each line of the rubric in BRIEF.md, honestly, in a table in `REVIEW.md`. For every line under 4, fix it now — the hero first, then 3D meaning, then the idea, then motion, then type, then palette. Re-shoot and re-score after fixing.',
+      'You are now the jury, and you are a harsh one. Take fresh screenshots of every page at desktop and 390px (`npm run shot -- --all`) and read every one of them. Score the site 1–5 against each line of the rubric in BRIEF.md, honestly, in a table in `REVIEW.md`. Scoring your own work 4 everywhere is the failure mode of this stage; find the three worst things and say so plainly.',
+      'Look for these specifically, because they are what the last builds got wrong: a scene that dies after the first viewport; sections that are empty rounded rectangles where a picture should be; a native select or `mm/dd/yyyy` date input in a form; a hero whose subject is cropped out of frame at 390px; a page whose only motion is things fading in; and no signature move at all.',
+      'For every line under 4, fix it now — the hero first, then the signature move, then the scene through the page, then imagery, then scroll craft, then 3D meaning, then the idea, then motion, then type, then palette. Re-shoot and re-score after fixing.',
       'Then the security list: grep the client bundle for any secret name, confirm headers in `next.config.ts`, confirm `/admin` needs a session, confirm rate limits and validation on every intake route, confirm `robots.txt` excludes `/admin`.',
       'Finish with the final scores and what changed.',
     ].join('\n'),

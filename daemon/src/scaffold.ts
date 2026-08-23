@@ -70,6 +70,12 @@ export function designConfigSource(spec: Spec): string {
 export const design = {
   name: ${JSON.stringify(spec.name)},
   archetype: ${JSON.stringify(spec.archetype)},
+  /**
+   * Where the business is, as a BCP-47 tag. Every date, time, number and
+   * currency on the site is formatted with Intl against this — a booking form
+   * for a restaurant in Lisbon must not ask for a date in mm/dd/yyyy.
+   */
+  locale: ${JSON.stringify(localeFor(spec.details?.location))},
   theme: ${JSON.stringify(spec.theme)} as 'dark' | 'light' | 'both',
   palette: {
     id: ${JSON.stringify(palette.id)},
@@ -128,10 +134,63 @@ export const design = {
   },
   layout: ${JSON.stringify(spec.layout)},
   atmosphere: ${JSON.stringify(spec.atmosphere)},
+  /**
+   * The one interaction this site has that the visitor has not seen
+   * elsewhere. Stage 1 names it here and in README.md; nothing else on the
+   * site is allowed to compete with it.
+   */
+  signature: ${JSON.stringify(spec.signature ?? '')},
 };
 
 export type Design = typeof design;
 `;
+}
+
+/**
+ * A locale from a place name. Deliberately a small table plus a sane default:
+ * getting `en-GB` instead of `en-US` right is worth far more than getting
+ * every country right, because it is the difference between a date a European
+ * can read and one they cannot.
+ */
+export function localeFor(location?: string): string {
+  const l = (location ?? '').toLowerCase();
+  const table: Array<[RegExp, string]> = [
+    [/portugal|lisbon|lisboa|porto/, 'pt-PT'],
+    [/brazil|brasil|s(a|ã)o paulo|rio de janeiro/, 'pt-BR'],
+    [/spain|espa(n|ñ)a|madrid|barcelona|valencia|seville/, 'es-ES'],
+    [/mexico|méxico|guadalajara|monterrey/, 'es-MX'],
+    [/france|paris|lyon|marseille|bordeaux/, 'fr-FR'],
+    [/germany|deutschland|berlin|munich|münchen|hamburg|cologne/, 'de-DE'],
+    [/austria|vienna|wien/, 'de-AT'],
+    [/switzerland|zurich|zürich|geneva|basel/, 'de-CH'],
+    [/netherlands|holland|amsterdam|rotterdam|utrecht/, 'nl-NL'],
+    [/belgium|brussels|antwerp|ghent/, 'nl-BE'],
+    [/italy|italia|milan|milano|rome|roma|florence|firenze/, 'it-IT'],
+    [/sweden|stockholm|gothenburg|malm(o|ö)/, 'sv-SE'],
+    [/norway|oslo|bergen/, 'nb-NO'],
+    [/denmark|copenhagen|k(o|ø)benhavn|aarhus/, 'da-DK'],
+    [/finland|helsinki/, 'fi-FI'],
+    [/poland|warsaw|krak(o|ó)w|gda(n|ń)sk/, 'pl-PL'],
+    [/japan|tokyo|osaka|kyoto/, 'ja-JP'],
+    [/korea|seoul|busan/, 'ko-KR'],
+    [/china|shanghai|beijing|shenzhen/, 'zh-CN'],
+    [/hong kong/, 'zh-HK'],
+    [/taiwan|taipei/, 'zh-TW'],
+    [/singapore/, 'en-SG'],
+    [/india|mumbai|delhi|bangalore|bengaluru|chennai|hyderabad|pune/, 'en-IN'],
+    [/australia|sydney|melbourne|brisbane|perth/, 'en-AU'],
+    [/new zealand|auckland|wellington/, 'en-NZ'],
+    [/canada|toronto|vancouver|montreal|montréal|calgary|ottawa/, 'en-CA'],
+    [/ireland|dublin|cork|galway/, 'en-IE'],
+    [/south africa|cape town|johannesburg|durban/, 'en-ZA'],
+    [/uae|dubai|abu dhabi|emirates/, 'en-AE'],
+    [/united states|u\.s\.|usa|new york|los angeles|chicago|san francisco|seattle|austin|boston|miami|denver|portland|atlanta/, 'en-US'],
+    [/united kingdom|england|scotland|wales|london|manchester|bristol|edinburgh|glasgow|leeds|birmingham/, 'en-GB'],
+  ];
+  for (const [re, tag] of table) if (re.test(l)) return tag;
+  // en-GB rather than en-US: day-month-year is what most of the world reads,
+  // and an unknown location is far more likely to be outside the US.
+  return 'en-GB';
 }
 
 function isLight(hex: string): boolean {

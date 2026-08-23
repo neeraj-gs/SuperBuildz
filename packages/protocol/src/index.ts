@@ -205,10 +205,56 @@ export interface Spec {
   dna?: DesignDNA[];
   assets: string[];
   notes?: string;
+
+  /**
+   * What imagery exists. Everything a site shows has to come from somewhere,
+   * and the honest answer is usually "nothing yet" — which is a design brief,
+   * not an excuse for a grid of empty rounded rectangles.
+   */
+  imagery?: Imagery;
+  /**
+   * The one thing this site does that the person has not seen another site do.
+   * It becomes the signature move: one memorable interaction, named in the
+   * README, that nothing else on the site competes with.
+   */
+  signature?: string;
+  /** What a visitor must believe by the end. One sentence, not a feature list. */
+  belief?: string;
+  /** Where the page should feel calm and where it should feel intense. */
+  rhythm?: string;
+  /**
+   * Build three complete visual directions after the identity stage and let
+   * the person pick one before the rest is built. You cannot describe a
+   * design; you can point at one.
+   */
+  directions?: boolean;
+
   /** Run the award-jury review stage after building. */
   review: boolean;
   /** Dollar ceiling passed to Claude Code, when the person set one. */
   budgetUsd?: number;
+}
+
+/** Where the pictures come from — or what to do instead. */
+export interface Imagery {
+  kind: 'have' | 'some' | 'none';
+  /** A folder on this machine whose contents are copied into `public/media`. */
+  folder?: string;
+  /** What the photographs are of, in the person's words. */
+  describes?: string;
+  /** Design devices to use where a photograph would have gone. */
+  instead: string[];
+}
+
+/** One of the visual directions built for the person to choose between. */
+export interface Direction {
+  id: string;
+  name: string;
+  /** The one-line design DNA, shown above the column. */
+  note: string;
+  /** Route the preview serves this direction from. */
+  path: string;
+  swatch?: string[];
 }
 
 /** What the builder will do, shown before it does any of it. */

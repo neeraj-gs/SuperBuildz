@@ -20,6 +20,20 @@ export interface SceneProps {
   progress: MutableRefObject<number>;
   /** Pointer in NDC (-1..1), written by the host. */
   pointer: MutableRefObject<[number, number]>;
+  /**
+   * Which chapter of the page is on screen, eased between whole numbers, when
+   * the scene is running page-wide under `SceneLayer`. Sections declare theirs
+   * with `data-scene-frame`. A scene that ignores it still works; a scene that
+   * uses it is alive for the whole document rather than only the hero, which
+   * is the difference this template is judged on.
+   */
+  frame?: MutableRefObject<number>;
+  /**
+   * True below 720px. Portrait is not a narrower landscape: recompose — move
+   * the camera, re-centre the subject, drop background elements — rather than
+   * letting the subject crop out of frame.
+   */
+  portrait?: boolean;
   /** The business name, for scenes that build it. */
   name?: string;
   /** `preview` keeps counts low for a small canvas; `full` is the hero. */

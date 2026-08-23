@@ -4,6 +4,11 @@
  *   npm run shot -- /            one route, desktop
  *   npm run shot -- /about --mobile --reduced
  *   npm run shot -- --all        every route in app/ (page.tsx files), desktop and mobile
+ *   npm run shot -- / --scroll   six frames evenly down the page
+ *
+ * `--scroll` is how you check pacing. A pinned sequence that reads correctly
+ * in the code and plays out in 300px of scroll looks like a flicker to a
+ * reader; the only way to know is to look at frames through it.
  *
  * Needs the dev server running (Super Builds starts it) and the Playwright
  * Chromium installed through the requirements screen. Writes shots/<name>.png.
@@ -16,6 +21,8 @@ const args = process.argv.slice(2);
 const mobile = args.includes('--mobile');
 const reduced = args.includes('--reduced');
 const all = args.includes('--all');
+const scroll = args.includes('--scroll');
+const FRAMES = 6;
 const port = process.env.PORT ?? process.env.SUPERBUILDS_PREVIEW_PORT ?? '3000';
 const base = process.env.SHOT_BASE ?? `http://127.0.0.1:${port}`;
 let routes = args.filter((a) => a.startsWith('/'));
@@ -56,6 +63,21 @@ for (const size of sizes) {
       });
       await page.screenshot({ path: `shots/${name}-full.png`, fullPage: true });
       console.log(`shots/${name}.png`);
+
+      if (scroll) {
+        // Frames evenly down the page. Read them in order: if two adjacent
+        // frames are identical the section is not earning its scroll, and if
+        // a sequence resolves entirely between two frames it is too fast.
+        const height = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+        for (let i = 0; i < FRAMES; i++) {
+          const y = Math.round((height * i) / (FRAMES - 1));
+          await page.evaluate((to) => window.scrollTo(0, to), y);
+          await page.waitForTimeout(700);
+          await page.screenshot({ path: `shots/${name}-scroll-${i + 1}.png` });
+        }
+        await page.evaluate(() => window.scrollTo(0, 0));
+        console.log(`shots/${name}-scroll-1..${FRAMES}.png`);
+      }
     } catch (err) { console.error(`${route}: ${err.message.split('\n')[0]}`); }
   }
   await context.close();

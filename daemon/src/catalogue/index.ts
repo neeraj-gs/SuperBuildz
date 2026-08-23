@@ -60,6 +60,8 @@ export function defaultsFor(archetypeId: string): Omit<Spec, 'name' | 'folder'> 
     deploy: 'vercel',
     references: [],
     assets: [],
+    imagery: { kind: 'none', instead: [] },
+    directions: true,
     review: true,
   };
 }
@@ -77,5 +79,7 @@ export function completeSpec(partial: Partial<Spec> & { name?: string; folder?: 
   merged.name = merged.name || 'Untitled';
   merged.folder = merged.folder || '';
   merged.review = merged.review !== false;
+  merged.directions = merged.directions !== false;
+  merged.imagery = merged.imagery ?? { kind: 'none', instead: [] };
   return merged;
 }
