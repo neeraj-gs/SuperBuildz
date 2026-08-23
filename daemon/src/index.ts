@@ -30,6 +30,7 @@ import { startCapture, getCapture, captureAvailable, thumbnailFor } from './refe
 import { deployStatus, vercelLogin, deployProject, setEnvValue } from './deploy.ts';
 import { judge, hookResponse } from './policy.ts';
 import { tweakState, setTweaks, shufflePalette } from './tweaks.ts';
+import { proposeDirections, readDirections, chooseDirection } from './directions.ts';
 import { superbuildsHome, uiDist } from './paths.ts';
 
 const PORT = Number(process.env.SUPERBUILDS_PORT ?? 7747);
@@ -241,6 +242,26 @@ app.post('/api/projects/:id/deploy', async (req, reply) => {
   const { target } = (req.body ?? {}) as { target?: 'production' | 'preview' };
   try { return await deployProject((req.params as { id: string }).id, target === 'preview' ? 'preview' : 'production'); } catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
 });
+/* Three directions, side by side: pointing at a design instead of describing one */
+
+app.get('/api/projects/:id/directions', async (req, reply) => {
+  const p = getProject((req.params as { id: string }).id); if (!p) return reply.code(404).send({ error: 'no such project' });
+  return { directions: readDirections(p.path) };
+});
+app.post('/api/projects/:id/directions', async (req, reply) => {
+  try { return { directions: await proposeDirections((req.params as { id: string }).id) }; }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.post('/api/projects/:id/directions/choose', async (req, reply) => {
+  const { id } = (req.body ?? {}) as { id?: string };
+  if (!id) return reply.code(400).send({ error: 'which direction?' });
+  try {
+    const state = chooseDirection((req.params as { id: string }).id, id);
+    broadcast({ type: 'tweaks.update', state });
+    return state;
+  } catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+
 /* The tweak panel: design by dragging, written to the project's design.tweaks.json */
 
 app.get('/api/projects/:id/tweaks', async (req, reply) => {

@@ -37,10 +37,7 @@ export interface Tweaks {
 export const tweaks: Tweaks = rawTweaks as Tweaks;
 
 const px = (n: number) => `${Math.round(n * 100) / 100}px`;
-const ms = (n: number) => `${Math.round(n)}ms`;
-/** Scale a `clamp(a, b, c)` or a plain length without parsing CSS properly. */
-const scale = (value: string, by: number) =>
-  by === 1 ? value : `calc(${value} * ${Math.round(by * 1000) / 1000})`;
+const round = (n: number) => String(Math.round(n * 1000) / 1000);
 
 export function paletteFor(theme: Theme) {
   const base = design.palette;
@@ -81,25 +78,42 @@ export function cssVariables(theme: Theme): Record<string, string> {
     '--font-body': fontFamilies.body,
     '--font-mono': fontFamilies.mono,
 
-    '--display-size': scale(design.type.displaySize, t.displayScale ?? 1),
+    /*
+      Anything scalable is published as a base and a multiplier, with the
+      usable variable derived from both in CSS. It costs three variables
+      instead of one and buys something worth much more: a direction preview
+      or a slider can change the multiplier alone, without having to read the
+      current value back out of the cascade and multiply it in JavaScript —
+      which is fragile, order-dependent, and was quietly collapsing the
+      display type to 17px when it failed.
+    */
+    '--display-size-base': design.type.displaySize,
+    '--display-scale': round(t.displayScale ?? 1),
+    '--display-size': 'calc(var(--display-size-base) * var(--display-scale))',
     '--display-tracking': t.displayTracking !== undefined ? `${t.displayTracking}em` : design.type.displayTracking,
     '--display-leading': design.type.displayLeading,
-    '--body-size': scale(design.type.bodySize, t.bodyScale ?? 1),
+
+    '--body-size-base': design.type.bodySize,
+    '--body-scale': round(t.bodyScale ?? 1),
+    '--body-size': 'calc(var(--body-size-base) * var(--body-scale))',
     '--body-leading': design.type.bodyLeading,
     '--measure': t.measure !== undefined ? `${t.measure}ch` : design.type.measure,
 
     '--radius': t.radius !== undefined ? px(t.radius) : design.shape.radius,
     '--radius-lg': t.radius !== undefined ? px(t.radius * 1.8) : design.shape.radiusLg,
 
-    '--section': scale(design.space.section, t.section ?? 1),
+    '--section-base': design.space.section,
+    '--section-scale': round(t.section ?? 1),
+    '--section': 'calc(var(--section-base) * var(--section-scale))',
     '--gutter': t.gutter !== undefined ? px(t.gutter) : design.space.gutter,
 
     '--ease-out': design.motion.easeOut,
     '--ease-in-out': design.motion.easeInOut,
-    '--fast': ms(design.motion.fast * (t.pace ?? 1)),
-    '--base': ms(design.motion.base * (t.pace ?? 1)),
-    '--slow': ms(design.motion.slow * (t.pace ?? 1)),
-    '--stagger': ms(t.stagger ?? design.motion.stagger),
+    '--pace': round(t.pace ?? 1),
+    '--fast': `calc(${design.motion.fast}ms * var(--pace))`,
+    '--base': `calc(${design.motion.base}ms * var(--pace))`,
+    '--slow': `calc(${design.motion.slow}ms * var(--pace))`,
+    '--stagger': `${Math.round(t.stagger ?? design.motion.stagger)}ms`,
     '--rise': px(t.rise ?? design.motion.rise),
 
     '--grain': String(t.grain ?? 0),

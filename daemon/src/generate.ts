@@ -16,6 +16,7 @@ import { getSession } from './store.ts';
 import { stagesFor } from './brief.ts';
 import { startPreview } from './preview.ts';
 import { thumbnailFor } from './reference.ts';
+import { proposeDirections } from './directions.ts';
 
 const states = new Map<string, GenerationState>();
 const cancelled = new Set<string>();
@@ -83,6 +84,16 @@ export async function runGeneration(projectId: string): Promise<GenerationState>
       const cur = states.get(projectId);
       push(projectId, { costUsd: (cur?.costUsd ?? 0) + (turn.costUsd ?? 0) });
       setStage(projectId, stage.id, { status: 'done', endedAt: Date.now() });
+
+      // As soon as the identity exists there is something to vary, so the
+      // three directions are proposed in the background — by the time the
+      // build finishes they are waiting behind the Directions button rather
+      // than costing the person a two-minute wait at the moment they are
+      // finally ready to look at their site. A failure here is not a build
+      // failure: they can press Propose themselves.
+      if (stage.id === 'identity' && spec.directions !== false) {
+        void proposeDirections(projectId).catch(() => {});
+      }
     } catch (err) {
       const msg = (err as Error).message;
       setStage(projectId, stage.id, { status: cancelled.has(projectId) ? 'skipped' : 'failed', endedAt: Date.now(), note: msg });

@@ -157,3 +157,34 @@ test('the review stage is on by default and knows what to look for', () => {
   assert.match(prompt, /mm\/dd\/yyyy/);
   assert.match(prompt, /cropped out of frame at 390px/);
 });
+
+test('a direction only ever names tokens, and the schema keeps it that way', async () => {
+  const { DIRECTIONS_SCHEMA, directionsPrompt } = await import('../src/directions.ts');
+  const props = DIRECTIONS_SCHEMA.properties.directions.items.properties.tweaks.properties as Record<string, unknown>;
+  const { TWEAK_CONTROLS } = await import('../src/tweaks.ts');
+  const known = new Set(TWEAK_CONTROLS.map((c) => c.key as string));
+  for (const key of Object.keys(props)) {
+    assert.ok(known.has(key), `${key} is not a control the tune panel or lib/tokens.ts knows about`);
+  }
+  // Three, and genuinely three: a schema that allowed one would let a model
+  // answer with one and call the feature done.
+  assert.equal(DIRECTIONS_SCHEMA.properties.directions.minItems, 3);
+  assert.equal(DIRECTIONS_SCHEMA.properties.directions.maxItems, 3);
+
+  const prompt = directionsPrompt(completeSpec({ ...defaultsFor('restaurant'), name: 'Ember', folder: '', details: { location: 'Lisbon' } }));
+  assert.match(prompt, /Ember/);
+  assert.match(prompt, /Lisbon/);
+  assert.match(prompt, /7:1/, 'contrast has to be required or a direction can be unreadable');
+  assert.match(prompt, /Vary more than colour/);
+});
+
+test('tweaks are sanitised before they are written into somebody\'s project', async () => {
+  const { sanitise } = await import('../src/tweaks.ts');
+  assert.deepEqual(sanitise({ bg: '#ABCDEF' }), { bg: '#abcdef' });
+  assert.deepEqual(sanitise({ bg: 'red' }), {}, 'only hex, so nothing can be smuggled into the file');
+  assert.deepEqual(sanitise({ bg: '#fff' }), {}, 'short hex is rejected rather than guessed at');
+  assert.deepEqual(sanitise({ nonsense: 1, __proto__: {} }), {}, 'unknown keys never reach the file');
+  assert.deepEqual(sanitise({ grain: 99 }), { grain: 0.3 }, 'out of range is clamped, not refused');
+  assert.deepEqual(sanitise({ pace: -5 }), { pace: 0.4 });
+  assert.deepEqual(sanitise({ radius: Number.NaN }), {});
+});

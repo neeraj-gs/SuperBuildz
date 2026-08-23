@@ -49,6 +49,13 @@ export function SceneLayer({
   const [portrait, setPortrait] = useState(false);
   const [theme, setTheme] = useState<Theme>(() =>
     typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+  // The scene takes its colours from the *live* CSS variables, not from
+  // design.config.ts. Anything that recolours the page — the theme switch, a
+  // slider in the tune panel, a `?direction=` preview — moves those variables,
+  // and a scene reading the config instead would stay the old colour while
+  // the DOM around it changed. Which is precisely what a light direction
+  // looked like: a pale page with a black hero sitting in it.
+  const [live, setLive] = useState(0);
 
   const host = useRef<HTMLDivElement>(null);
   const progress = useRef(0);
@@ -113,9 +120,11 @@ export function SceneLayer({
     window.addEventListener('pointermove', onMove, { passive: true });
     document.addEventListener('visibilitychange', onVis);
 
-    const themeObs = new MutationObserver(() =>
-      setTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'));
-    themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    const themeObs = new MutationObserver(() => {
+      setTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+      setLive((n) => n + 1);
+    });
+    themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'data-sb-direction'] });
 
     tick();
     return () => {
@@ -131,7 +140,7 @@ export function SceneLayer({
     };
   }, []);
 
-  const palette = paletteFor(theme);
+  const palette = livePalette(theme, live);
   const heavy = design.scene.weight === 'heavy';
   const dpr: [number, number] = heavy && portrait ? [0.75, 1] : [1, 2];
   const show = ready && !reduced && webgl;
@@ -183,3 +192,25 @@ export function SceneContent({ children, className = '' }: { children: React.Rea
 }
 
 export type { ComponentType };
+
+/**
+ * The palette as the page is actually painting it right now. Falls back to the
+ * configured values during the server render and before hydration, when there
+ * is no cascade to read.
+ */
+function livePalette(theme: Theme, _tick: number) {
+  const fallback = paletteFor(theme);
+  if (typeof document === 'undefined') return fallback;
+  const c = getComputedStyle(document.documentElement);
+  const read = (name: string, or: string) => {
+    const v = c.getPropertyValue(name).trim();
+    return /^#|^rgb|^hsl|^oklab|^oklch|^color/.test(v) ? v : or;
+  };
+  return {
+    bg: read('--bg', fallback.bg),
+    fg: read('--fg', fallback.fg),
+    accent: read('--accent', fallback.accent),
+    muted: read('--muted', fallback.muted),
+    surface: read('--surface', fallback.surface),
+  };
+}

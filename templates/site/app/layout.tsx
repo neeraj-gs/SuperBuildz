@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import './globals.css';
 import { fontVariables } from './fonts';
@@ -9,6 +10,7 @@ import { Cursor } from '@/components/ui/Cursor';
 import { PageTransition } from '@/components/ui/PageTransition';
 import { ThemeScript } from '@/components/ui/ThemeToggle';
 import { SceneLayer, SceneContent } from '@/components/SceneLayer';
+import { DirectionPreview } from '@/components/ui/DirectionPreview';
 
 export const metadata: Metadata = {
   title: { default: design.name, template: `%s — ${design.name}` },
@@ -34,6 +36,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PageTransition>{children}</PageTransition>
         </SceneContent>
         <Cursor />
+        {/* `?direction=<id>` previews one of directions.json. Nothing when absent. */}
+        <Suspense fallback={null}><DirectionPreview /></Suspense>
         <AnalyticsProviders />
       </body>
     </html>

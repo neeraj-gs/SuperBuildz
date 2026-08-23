@@ -13,6 +13,7 @@ import { Chat } from './Chat';
 import { Stages } from './Stages';
 import { DeployPanel } from './DeployPanel';
 import { TweakPanel } from './TweakPanel';
+import { Directions } from './Directions';
 
 export function Workspace({ id }: { id: string }) {
   const project = useStore((s) => s.projects[id]);
@@ -24,6 +25,7 @@ export function Workspace({ id }: { id: string }) {
   const [view, setView] = useState<'site' | 'admin'>('site');
   const [showDeploy, setShowDeploy] = useState(false);
   const [tuning, setTuning] = useState(false);
+  const [directions, setDirections] = useState(false);
   const [reload, setReload] = useState(0);
   const [starting, setStarting] = useState(false);
 
@@ -92,6 +94,7 @@ export function Workspace({ id }: { id: string }) {
               <Seg on={device === 'desktop'} onClick={() => setDevice('desktop')} title="Desktop"><Icon name="monitor" size={14} /></Seg>
               <Seg on={device === 'mobile'} onClick={() => setDevice('mobile')} title="Phone"><Icon name="phone" size={14} /></Seg>
               <span className="w-px h-5 bg-line mx-1" />
+              <Seg on={directions} onClick={() => setDirections(true)} title="Three directions, side by side"><Icon name="layout" size={14} /> Directions</Seg>
               <Seg on={tuning} onClick={() => setTuning((t) => !t)} title="Tune the design — colour, type, space, motion"><Icon name="sliders" size={14} /> Tune</Seg>
               <span className="w-px h-5 bg-line mx-1" />
               {preview?.running ? (
@@ -129,6 +132,7 @@ export function Workspace({ id }: { id: string }) {
         </section>
       </div>
 
+      {directions && <Directions projectId={id} url={url} onClose={() => setDirections(false)} />}
       {showDeploy && <DeployPanel projectId={id} onClose={() => setShowDeploy(false)} />}
     </div>
   );
