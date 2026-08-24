@@ -11,6 +11,8 @@ import { join } from 'node:path';
 import { listDir, readProjectFile, writeProjectFile, deleteProjectFile, createProjectFile, searchProject, languageOf } from '../src/files.ts';
 import { PROVIDERS, keysNeededFor, analyticsChoices, dashboardUrl } from '../src/analytics.ts';
 import { hashPassword, makePassword } from '../src/admin.ts';
+import { completeSpec } from '../src/catalogue/index.ts';
+import { designConfigSource } from '../src/scaffold.ts';
 
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), 'sb-files-'));
@@ -111,4 +113,27 @@ test('a generated password is readable and long enough to be worth having', () =
     assert.match(p, /^[a-z]+-[a-z]+-\d{3}$/);
     assert.ok(p.length >= 10);
   }
+});
+
+test('a custom palette is five hex colours or nothing at all', () => {
+  const five = { bg: '#101010', fg: '#f0f0f0', accent: '#c8ff3d', muted: '#808080', surface: '#1a1a1a' };
+  assert.deepEqual(completeSpec({ customPalette: five }).customPalette, five);
+
+  // Uppercase is normalised; a half-filled set is refused outright, because a
+  // page with two of the five moved is worse than the palette it started from.
+  assert.deepEqual(completeSpec({ customPalette: { ...five, accent: '#C8FF3D'.toUpperCase() } }).customPalette?.accent, '#c8ff3d');
+  assert.equal(completeSpec({ customPalette: { ...five, muted: '' } as never }).customPalette, undefined);
+  assert.equal(completeSpec({ customPalette: { ...five, bg: 'red' } as never }).customPalette, undefined);
+
+  // The one that matters: these are written into design.config.ts as source.
+  assert.equal(completeSpec({ customPalette: { ...five, bg: '#000000"; process.exit(1); //' } as never }).customPalette, undefined);
+  assert.equal(completeSpec({ customPalette: { ...five, fg: 'var(--x)' } as never }).customPalette, undefined);
+});
+
+test('a custom palette reaches design.config.ts and beats the listed one', () => {
+  const five = { bg: '#101010', fg: '#f0f0f0', accent: '#c8ff3d', muted: '#808080', surface: '#1a1a1a' };
+  const spec = completeSpec({ name: 'Test', archetype: 'restaurant', palette: 'ember', customPalette: five });
+  const src = designConfigSource(spec);
+  assert.match(src, /#101010/);
+  assert.match(src, /#c8ff3d/);
 });

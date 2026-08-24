@@ -90,5 +90,24 @@ export function completeSpec(partial: Partial<Spec> & { name?: string; folder?: 
   merged.review = merged.review !== false;
   merged.directions = merged.directions !== false;
   merged.imagery = merged.imagery ?? { kind: 'none', instead: [] };
+  merged.customPalette = cleanPalette(partial.customPalette);
   return merged;
+}
+
+/**
+ * Five hex colours, or nothing.
+ *
+ * These are written into the generated `design.config.ts` and from there into
+ * CSS custom properties, so an unchecked value is a string the browser will
+ * evaluate as a colour and a compiler will evaluate as source. A strict
+ * six-digit pattern is the whole defence and it is enough: anything that is not
+ * exactly that is not a colour anybody meant.
+ */
+function cleanPalette(p: Spec['customPalette']): Spec['customPalette'] {
+  if (!p) return undefined;
+  const hex = (v: unknown) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : undefined);
+  const bg = hex(p.bg), fg = hex(p.fg), accent = hex(p.accent), muted = hex(p.muted), surface = hex(p.surface);
+  // All five or none: a half-applied palette is worse than the listed one.
+  if (!bg || !fg || !accent || !muted || !surface) return undefined;
+  return { bg, fg, accent, muted, surface };
 }

@@ -18,7 +18,7 @@ import type { Plan, Spec } from '@superbuilds/protocol';
 import {
   ANALYTICS, ATMOSPHERES, CRM, CURSOR_STYLES, FEATURES, GOALS, HERO_RULE, HOVER_STYLES, LAYOUTS, MOTION_INTENSITY,
   PAGES, PALETTES, SCROLL_STYLES, TRANSITIONS, TYPOGRAPHY, archetypeFor, sceneFor,
-  SIGNATURES, RHYTHMS, IMAGERY_DEVICES, beliefsFor,
+  SIGNATURES, RHYTHMS, IMAGERY_DEVICES, beliefsFor, SCENES, THEMES,
 } from './catalogue/index.ts';
 import type { Choice } from '@superbuilds/protocol';
 
@@ -141,7 +141,14 @@ export function masterBrief(spec: Spec): string {
   const arch = archetypeFor(spec.archetype);
   const sector = arch.sectors.find((s) => s.id === spec.sector);
   const scene = sceneFor(spec.scene);
-  const palette = PALETTES.find((p) => p.id === spec.palette) ?? PALETTES[0];
+  const listed = PALETTES.find((p) => p.id === spec.palette) ?? PALETTES[0];
+  // Colours mixed by hand replace the palette they started from. The label
+  // still matters in the brief, because "the Ember palette, moved" tells the
+  // build something "five hex codes" does not.
+  const cp = spec.customPalette;
+  const palette = cp
+    ? { label: `their own five (nearest listed: ${listed.label})`, swatch: [cp.bg, cp.fg, cp.accent, cp.muted, cp.surface] }
+    : listed;
   const type = TYPE_DIRECTION[spec.typography] ?? TYPE_DIRECTION.grotesk;
   const funnel = GOAL_FUNNEL[spec.goal] ?? GOAL_FUNNEL.enquiries;
   const pages = spec.pages.map((p) => label(PAGES, p));
@@ -542,6 +549,21 @@ export function namesPrompt(spec: Spec): string {
   return `Suggest 6 to 8 business names for a ${arch.label.toLowerCase()}${spec.sector ? ` (${spec.sector})` : ''}${spec.details?.location ? ` in ${spec.details.location}` : ''} with a ${label(ATMOSPHERES, spec.atmosphere).toLowerCase()} feel. Short, pronounceable, not already famous brands, no puns that age badly. One line each on why.`;
 }
 
+/**
+ * The extraction answers two things at once.
+ *
+ * The prose half is what a person reads: what this site is doing and why it
+ * works. The `suggests` half is what the wizard uses: the nearest id in our own
+ * catalogue for every choice it is about to ask. Splitting these into two calls
+ * would double the cost and halve the agreement between them, because the
+ * second call would be reasoning from the first call's summary rather than from
+ * the screenshots.
+ *
+ * Every id is constrained by `enum`, so a hallucinated option cannot reach the
+ * spec. A missing one is fine and means "no strong opinion".
+ */
+const HEX = { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' };
+
 export const DNA_SCHEMA = {
   type: 'object',
   properties: {
@@ -554,9 +576,35 @@ export const DNA_SCHEMA = {
     hero: { type: 'string' },
     keep: { type: 'array', items: { type: 'string' } },
     avoid: { type: 'array', items: { type: 'string' } },
+    suggests: {
+      type: 'object',
+      properties: {
+        palette: { type: 'string', enum: PALETTES.map((c) => c.id) },
+        typography: { type: 'string', enum: TYPOGRAPHY.map((c) => c.id) },
+        atmosphere: { type: 'string', enum: ATMOSPHERES.map((c) => c.id) },
+        layout: { type: 'string', enum: LAYOUTS.map((c) => c.id) },
+        scene: { type: 'string', enum: SCENES.map((c) => c.id) },
+        motionIntensity: { type: 'string', enum: MOTION_INTENSITY.map((c) => c.id) },
+        scrollStyle: { type: 'string', enum: SCROLL_STYLES.map((c) => c.id) },
+        hoverStyle: { type: 'string', enum: HOVER_STYLES.map((c) => c.id) },
+        cursorStyle: { type: 'string', enum: CURSOR_STYLES.map((c) => c.id) },
+        transition: { type: 'string', enum: TRANSITIONS.map((c) => c.id) },
+        theme: { type: 'string', enum: THEMES.map((c) => c.id) },
+        signature: { type: 'string' },
+      },
+    },
+    customPalette: {
+      type: 'object',
+      properties: { bg: HEX, fg: HEX, accent: HEX, muted: HEX, surface: HEX },
+      required: ['bg', 'fg', 'accent', 'muted', 'surface'],
+    },
   },
   required: ['summary', 'palette', 'typography', 'layout', 'motion', 'threeD', 'hero', 'keep', 'avoid'],
 };
+
+function options(label: string, list: Choice[]): string {
+  return `${label}: ${list.map((c) => `${c.id} (${c.label}${c.blurb ? ` — ${c.blurb}` : ''})`).join('; ')}`;
+}
 
 export function dnaPrompt(url: string, shots: string[], htmlSummary: string): string {
   return [
@@ -566,6 +614,23 @@ export function dnaPrompt(url: string, shots: string[], htmlSummary: string): st
     '', 'What its HTML reveals (fonts, libraries, meta):', htmlSummary.slice(0, 3000),
     '',
     'Answer the schema. `palette`: the four or five dominant colours as hex with a word each. `typography.scale`: how large display type runs relative to the viewport and how it is set. `layout`: the page\'s organising system in one sentence. `motion`: what moves, how, and what it responds to. `threeD`: what WebGL or depth is used for, or "none". `hero`: what the first viewport does. `keep`: 3–6 qualities worth carrying into a *different* site. `avoid`: 2–5 things that must not be copied because they are this site\'s signature.',
+    '',
+    'Then fill in `suggests`. Somebody is about to be asked these same questions about their own site, and your answers become the pre-selected options they will disagree with. Pick the nearest one in each list from what you actually saw — not what would flatter the site, and not what is most common. Leave a field out entirely rather than guess.',
+    '',
+    options('palette', PALETTES),
+    options('typography', TYPOGRAPHY),
+    options('atmosphere', ATMOSPHERES),
+    options('layout', LAYOUTS),
+    options('scene', SCENES),
+    options('motionIntensity', MOTION_INTENSITY),
+    options('scrollStyle', SCROLL_STYLES),
+    options('hoverStyle', HOVER_STYLES),
+    options('cursorStyle', CURSOR_STYLES),
+    options('transition', TRANSITIONS),
+    options('theme', THEMES),
+    `signature: the one memorable move, as one short sentence, or one of these ids: ${SIGNATURES.map((c) => c.id).join(', ')}`,
+    '',
+    'Finally `customPalette`: this site\'s own five colours sampled from the screenshots, as six-digit hex — `bg` the page ground, `fg` the body text, `accent` the one colour used for emphasis, `muted` the quiet text, `surface` the raised panels. These are offered to the person as a starting point they can drag; they are not a licence to reproduce the site.',
   ].join('\n');
 }
 

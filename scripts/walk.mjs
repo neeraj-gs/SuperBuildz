@@ -90,6 +90,36 @@ if (await gear.count()) {
   }
 } else { console.log('  MISSING: the options menu'); failures++; }
 
+/* The wizard: the screens that used to take thirteen presses to get back to. */
+
+await page.goto(`${base}/new`, { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(1600);
+await shot('wizard-reference', 'the reference screen, asked first');
+
+// The reference is optional, so Next moves straight on to the shape question.
+await press('Next', 'past the reference');
+await page.waitForTimeout(900);
+
+// Choosing a shape is what unlocks the rest of the jump menu.
+if (await press('Restaurant', 'archetype')) {
+  await page.waitForTimeout(1000);
+  for (const [label, name] of [['Colour', 'palette'], ['Pictures', 'pictures'], ['Motion', 'motion']]) {
+    const jump = page.locator('button[title="Every screen"]').first();
+    if (!(await jump.count())) { console.log('  MISSING: the jump menu'); failures++; break; }
+    await jump.click().catch(() => {});
+    await page.waitForTimeout(350);
+    if (await press(label, `jump to ${name}`)) await shot(`wizard-${name}`, `${name}, reached in one press`);
+  }
+  // Back to colour, because the custom editor lives there and the loop above
+  // left us on motion.
+  await page.locator('button[title="Every screen"]').first().click().catch(() => {});
+  await page.waitForTimeout(350);
+  if (await press('Colour', 'back to colour')) {
+    await page.waitForTimeout(700);
+    if (await press('Or mix your own', 'custom palette')) await shot('wizard-custom-palette', 'five colours mixed by hand');
+  }
+}
+
 await browser.close();
 console.log(failures ? `\n${failures} problem(s). Look at shots/panel-*.png.` : '\nAll panels rendered clean. shots/panel-*.png');
 process.exit(failures ? 1 : 0);

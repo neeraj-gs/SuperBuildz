@@ -1,13 +1,34 @@
 /**
- * A website, specified entirely by pressing things. Fifteen screens, not one
- * with a required text field (the name is the one field, and it can be
- * suggested). Choosing the kind of business answers the next twenty
- * questions; the rest is disagreeing with good defaults. Nothing is created,
- * installed or spent until the last press.
+ * A website, specified entirely by pressing things.
+ *
+ * Eighteen screens, not one with a required text field (the name is the one
+ * field, and it can be suggested). Choosing the kind of business answers the
+ * next twenty questions; the rest is disagreeing with good defaults. Nothing is
+ * created, installed or spent until the last press.
+ *
+ * ── Three changes that came from watching somebody use it ───────────────────
+ *
+ * **The reference site is asked first.** It used to be screen fifteen, which is
+ * backwards: by then every design decision had already been made by reading
+ * blurbs, and the one thing that would have made them easy — a site to point at
+ * — arrived after the work. Asked first, what it extracts pre-selects the
+ * twelve screens after it.
+ *
+ * **Every screen can be reached from every other screen.** The dots are
+ * buttons and there is a list of all eighteen behind one press. Getting back to
+ * screen two meant pressing Back thirteen times, which is not a wizard, it is a
+ * corridor.
+ *
+ * **Every screen takes a sentence as well as a press.** Options are the
+ * product — a non-coder should never have to compose a brief — but "pick the
+ * closest" has a cost, and the person who wants to say *why* they picked it
+ * should not have to wait until the end. The line is stored per step, so the
+ * brief can say "on colour, they said…" rather than dumping it all into one
+ * notes field.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Catalogue, DesignDNA, Plan, Spec } from '@superbuilds/protocol';
+import type { Catalogue, CustomPalette, Plan, Spec } from '@superbuilds/protocol';
 import { api, type Question } from '@/lib/api';
 import { useStore, navigate, toast } from '@/lib/store';
 import { Button, Chip, Index, Input, Spinner, Textarea, cx } from '@/components/ui';
@@ -15,30 +36,32 @@ import { Icon } from '@/components/icons';
 import { ChipMany, PickMany, PickOne, PickSwatch } from './Pickers';
 import { LivePreview } from './LivePreview';
 import { ReferenceStep } from './ReferenceStep';
+import { PicturesStep } from './PicturesStep';
+import { CustomPaletteEditor } from './CustomPalette';
 
 const STEPS = [
-  { id: 'what', title: 'What are you making?', lede: 'Pick the closest shape. Everything after this starts already answered.' },
-  { id: 'goal', title: 'What should it achieve?', lede: 'The one thing a visitor should end up doing.' },
-  { id: 'details', title: 'A few facts', lede: 'All optional. Whatever you give, the site will use; whatever you skip, it will leave honest placeholders for.' },
-  { id: 'contents', title: 'What goes in it?', lede: 'Pre-ticked for the kind of business you chose.' },
-  { id: 'belief', title: 'What should they believe by the end?', lede: 'Not a list of features — the one thing a visitor should walk away thinking. It decides what goes where.' },
-  { id: 'signature', title: 'The one thing it does that others do not', lede: 'Every site worth remembering has exactly one. Pick the one that belongs to this business, or let it decide.' },
-  { id: 'pictures', title: 'What pictures are there?', lede: 'Everything a site shows has to come from somewhere. “Nothing yet” is a real answer and a good brief.' },
-  { id: 'palette', title: 'Colour', lede: 'Real palettes, checked for contrast. The accent is used as light, not paint.' },
-  { id: 'type', title: 'Typography', lede: 'Watch the preview — the hero type changes as you choose.' },
-  { id: 'atmosphere', title: 'How should it feel?', lede: 'Not "modern and clean". That is what makes everything look the same.' },
-  { id: 'layout', title: 'Layout system', lede: 'How the whole page is organised, not how one section looks.' },
-  { id: 'scene', title: 'The 3D scene', lede: 'Real WebGL, previewed on the right. Move your pointer over it. It will be adapted to your business, not used as is.' },
-  { id: 'motion', title: 'How it moves', lede: 'Intensity, scroll, hover, cursor, transitions. One recurring gesture.' },
-  { id: 'theme', title: 'Dark or light', lede: 'Both is a real answer and costs nothing.' },
-  { id: 'reference', title: 'A site you admire', lede: 'Optional. It will be looked at, recorded and understood — and the result will be similar, not a copy.' },
-  { id: 'analytics', title: 'Analytics and CRM', lede: 'Where visitors and forms go. The built-in CRM is included and needs no account.' },
-  { id: 'deploy', title: 'Where it goes', lede: 'Vercel in one press, or just this machine for now.' },
-  { id: 'go', title: 'Here is what will happen', lede: 'Nothing has been created yet. Read it, then press the button.' },
+  { id: 'reference', title: 'A site you admire', lede: 'Optional, and the most useful thing you can do here. It will be looked at, recorded and understood — then you choose which parts to carry across, and everything after this opens already answered.', short: 'Reference' },
+  { id: 'what', title: 'What are you making?', lede: 'Pick the closest shape. Everything after this starts already answered.', short: 'What it is' },
+  { id: 'goal', title: 'What should it achieve?', lede: 'The one thing a visitor should end up doing.', short: 'The goal' },
+  { id: 'details', title: 'A few facts', lede: 'All optional. Whatever you give, the site will use; whatever you skip, it will leave honest placeholders for.', short: 'The facts' },
+  { id: 'contents', title: 'What goes in it?', lede: 'Pre-ticked for the kind of business you chose.', short: 'Contents' },
+  { id: 'belief', title: 'What should they believe by the end?', lede: 'Not a list of features — the one thing a visitor should walk away thinking. It decides what goes where.', short: 'The belief' },
+  { id: 'signature', title: 'The one thing it does that others do not', lede: 'Every site worth remembering has exactly one. Pick the one that belongs to this business, or let it decide.', short: 'Signature' },
+  { id: 'pictures', title: 'What pictures are there?', lede: 'Everything a site shows has to come from somewhere. “Nothing yet” is a real answer and a good brief.', short: 'Pictures' },
+  { id: 'palette', title: 'Colour', lede: 'Real palettes, checked for contrast. The accent is used as light, not paint.', short: 'Colour' },
+  { id: 'type', title: 'Typography', lede: 'Watch the preview — the hero type changes as you choose.', short: 'Typography' },
+  { id: 'atmosphere', title: 'How should it feel?', lede: 'Not "modern and clean". That is what makes everything look the same.', short: 'Atmosphere' },
+  { id: 'layout', title: 'Layout system', lede: 'How the whole page is organised, not how one section looks.', short: 'Layout' },
+  { id: 'scene', title: 'The 3D scene', lede: 'Real WebGL, previewed on the right. Move your pointer over it. It will be adapted to your business, not used as is.', short: '3D scene' },
+  { id: 'motion', title: 'How it moves', lede: 'Intensity, scroll, hover, cursor, transitions. One recurring gesture.', short: 'Motion' },
+  { id: 'theme', title: 'Dark or light', lede: 'Both is a real answer and costs nothing.', short: 'Theme' },
+  { id: 'analytics', title: 'Analytics and CRM', lede: 'Where visitors and forms go. The built-in CRM is included and needs no account.', short: 'Analytics' },
+  { id: 'deploy', title: 'Where it goes', lede: 'Vercel in one press, or just this machine for now.', short: 'Publishing' },
+  { id: 'go', title: 'Here is what will happen', lede: 'Nothing has been created yet. Read it, then press the button.', short: 'Build it' },
 ] as const;
 
 type StepId = typeof STEPS[number]['id'];
-const DRAFT = 'sb:draft:v1';
+const DRAFT = 'sb:draft:v2';
 
 type Draft = Partial<Spec> & { name: string; folder: string };
 
@@ -61,6 +84,7 @@ export function Wizard() {
   const [qBusy, setQBusy] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [folderNote, setFolderNote] = useState<string>('');
+  const [showJump, setShowJump] = useState(false);
 
   useEffect(() => { if (!catalogue) void useStore.getState().loadCatalogue(); }, [catalogue]);
   useEffect(() => { localStorage.setItem(DRAFT, JSON.stringify({ spec, at })); }, [spec, at]);
@@ -71,11 +95,19 @@ export function Wizard() {
   const chooseArchetype = async (id: string) => {
     try {
       const d = await api.defaults(id);
-      setSpec((s) => ({ ...d, ...pick(s, ['name', 'folder', 'details', 'references', 'dna', 'notes', 'theme', 'review', 'budgetUsd']), archetype: id, sector: undefined, name: s.name, folder: s.folder } as Draft));
+      // Everything the person has already decided survives the reset — including
+      // whatever they took from a reference site, which was chosen deliberately
+      // and would be maddening to lose by pressing "restaurant".
+      setSpec((s) => ({
+        ...d,
+        ...pick(s, ['name', 'folder', 'details', 'references', 'dna', 'notes', 'theme', 'review', 'budgetUsd', 'stepNotes', 'imagery']),
+        ...adoptedOverrides(s),
+        archetype: id,
+        sector: undefined,
+      } as Draft));
     } catch (e) { toast((e as Error).message, 'error'); }
   };
 
-  // The plan, when the last screen is reached.
   useEffect(() => {
     if (step.id !== 'go') return;
     let alive = true;
@@ -100,16 +132,55 @@ export function Wizard() {
     try { const r = await api.questions(spec); setQuestions(r.questions ?? []); if (r.error) toast(r.error, 'error'); } catch (e) { toast((e as Error).message, 'error'); } finally { setQBusy(false); }
   };
 
+  /**
+   * Which screens can be jumped to.
+   *
+   * Everything after "what are you making?" is pre-answered from the archetype,
+   * so before one is chosen those screens would show a grid with nothing
+   * selected and no defaults. The first two are always reachable; the rest open
+   * as soon as there is something to open them onto.
+   */
+  const reachable = (i: number) => i <= 1 || !!spec.archetype;
+  const answered = (id: StepId): boolean => {
+    switch (id) {
+      case 'reference': return (spec.references?.length ?? 0) > 0;
+      case 'what': return !!spec.archetype;
+      case 'goal': return !!spec.goal;
+      case 'details': return !!spec.name.trim();
+      case 'contents': return (spec.pages?.length ?? 0) > 0;
+      case 'belief': return !!spec.belief;
+      case 'signature': return !!spec.signature;
+      case 'pictures': return !!spec.imagery;
+      case 'palette': return !!spec.palette || !!spec.customPalette;
+      case 'type': return !!spec.typography;
+      case 'atmosphere': return !!spec.atmosphere;
+      case 'layout': return !!spec.layout;
+      case 'scene': return !!spec.scene;
+      case 'motion': return !!spec.motionIntensity;
+      case 'theme': return !!spec.theme;
+      case 'analytics': return (spec.analytics?.length ?? 0) > 0;
+      case 'deploy': return !!spec.deploy;
+      default: return false;
+    }
+  };
+
+  const goTo = (i: number) => { if (reachable(i)) { setAt(i); setShowJump(false); window.scrollTo({ top: 0, behavior: 'smooth' }); } };
   const canNext = step.id !== 'what' || !!spec.archetype;
-  const next = () => setAt((n) => Math.min(STEPS.length - 1, n + 1));
-  const back = () => setAt((n) => Math.max(0, n - 1));
+  const next = () => goTo(Math.min(STEPS.length - 1, at + 1));
+  const back = () => goTo(Math.max(0, at - 1));
 
   const build = async () => {
-    if (!spec.name.trim()) { toast('Give it a name first — or press Suggest names.', 'error'); setAt(2); return; }
+    if (!spec.name.trim()) { toast('Give it a name first — or press Suggest names.', 'error'); goTo(STEPS.findIndex((s) => s.id === 'details')); return; }
     if (detection && !detection.ok) { toast('Something is missing on this machine. Check the requirements first.', 'error'); navigate({ name: 'setup' }); return; }
     setBuilding(true);
     try {
-      const notes = [spec.notes ?? '', ...Object.entries(answers).map(([q, a]) => `${questions?.find((x) => x.id === q)?.question ?? q}: ${a.join(', ')}`)].filter(Boolean).join('\n');
+      // Everything typed beside an option, attributed to the screen it was typed
+      // on, plus the answers to whatever Claude asked at the end.
+      const notes = [
+        spec.notes ?? '',
+        ...Object.entries(spec.stepNotes ?? {}).filter(([, v]) => v.trim()).map(([k, v]) => `On ${STEPS.find((s) => s.id === k)?.short ?? k}: ${v.trim()}`),
+        ...Object.entries(answers).map(([q, a]) => `${questions?.find((x) => x.id === q)?.question ?? q}: ${a.join(', ')}`),
+      ].filter(Boolean).join('\n');
       const project = await api.createProject({ ...spec, notes });
       localStorage.removeItem(DRAFT);
       await api.generate(project.id);
@@ -120,17 +191,35 @@ export function Wizard() {
   if (!catalogue) return <div className="pt-24 flex items-center gap-3 text-bone-2 justify-center"><Spinner /> Loading the catalogue…</div>;
   const arch = catalogue.archetypes.find((a) => a.id === spec.archetype);
   const progressPct = ((at + 1) / STEPS.length) * 100;
+  const note = spec.stepNotes?.[step.id] ?? '';
+  const setNote = (v: string) => setSpec((s) => ({ ...s, stepNotes: { ...(s.stepNotes ?? {}), [step.id]: v } }));
 
   return (
     <div className="shell-wide pt-8">
-      {/* Progress */}
       <div className="flex items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-3 min-w-0">
           <span className="telemetry text-bone-3 shrink-0">{String(at + 1).padStart(2, '0')} / {STEPS.length}</span>
           <div className="hidden md:flex gap-1 flex-wrap">
             {STEPS.map((s, i) => (
-              <button key={s.id} onClick={() => i <= at && setAt(i)} className={cx('h-1.5 rounded-full transition-all', i < at ? 'bg-volt w-5' : i === at ? 'bg-bone w-8' : 'bg-line-2 w-3', i <= at ? 'cursor-pointer' : 'cursor-default')} aria-label={s.title} />
+              <button
+                key={s.id}
+                onClick={() => goTo(i)}
+                disabled={!reachable(i)}
+                title={`${s.short}${answered(s.id) ? ' — answered' : ''}`}
+                className={cx(
+                  'h-1.5 rounded-full transition-all',
+                  i === at ? 'bg-bone w-8' : answered(s.id) ? 'bg-volt w-5' : 'bg-line-2 w-3',
+                  reachable(i) ? 'cursor-pointer hover:bg-bone-2' : 'cursor-default opacity-40',
+                )}
+              />
             ))}
+          </div>
+          <div className="relative">
+            <button onClick={() => setShowJump((v) => !v)} className="chip shrink-0" title="Every screen">
+              <Icon name="list" size={13} /> <span className="hidden sm:inline">{step.short}</span>
+              <Icon name="chevronDown" size={12} className={cx('transition-transform', showJump && 'rotate-180')} />
+            </button>
+            {showJump && <JumpMenu at={at} reachable={reachable} answered={answered} onGo={goTo} onClose={() => setShowJump(false)} />}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -146,6 +235,8 @@ export function Wizard() {
           <p className="copy mt-3 mb-8">{step.lede}</p>
 
           <div key={step.id} className="fade">
+            {step.id === 'reference' && <ReferenceStep spec={spec} setSpec={setSpec} catalogue={catalogue} />}
+
             {step.id === 'what' && (
               <div className="space-y-6">
                 <PickOne options={catalogue.archetypes} value={spec.archetype} onChange={chooseArchetype} cols={2} />
@@ -190,13 +281,7 @@ export function Wizard() {
 
             {step.id === 'belief' && (
               <div className="space-y-7">
-                <PickOne
-                  options={catalogue.beliefs[spec.goal ?? 'enquiries'] ?? []}
-                  value={spec.belief}
-                  onChange={(v) => set('belief', spec.belief === v ? undefined : v)}
-                  cols={1}
-                  compact
-                />
+                <PickOne options={catalogue.beliefs[spec.goal ?? 'enquiries'] ?? []} value={spec.belief} onChange={(v) => set('belief', spec.belief === v ? undefined : v)} cols={1} compact />
                 <Group label="Or say it your own way">
                   <Input
                     placeholder="One sentence, in the words you would use"
@@ -212,13 +297,7 @@ export function Wizard() {
 
             {step.id === 'signature' && (
               <div className="space-y-7">
-                <PickOne
-                  options={catalogue.signatures}
-                  value={spec.signature}
-                  onChange={(v) => set('signature', spec.signature === v ? undefined : v)}
-                  cols={2}
-                  compact
-                />
+                <PickOne options={catalogue.signatures} value={spec.signature} onChange={(v) => set('signature', spec.signature === v ? undefined : v)} cols={2} compact />
                 <Group label="Or describe it yourself">
                   <Input
                     placeholder="“The fire should react when someone moves the mouse”"
@@ -235,7 +314,25 @@ export function Wizard() {
 
             {step.id === 'pictures' && <PicturesStep spec={spec} setSpec={setSpec} catalogue={catalogue} />}
 
-            {step.id === 'palette' && <PickSwatch options={catalogue.palettes} value={spec.palette} onChange={(v) => set('palette', v)} />}
+            {step.id === 'palette' && (
+              <div className="space-y-6">
+                <PickSwatch options={catalogue.palettes} value={spec.customPalette ? undefined : spec.palette} onChange={(v) => setSpec((s) => ({ ...s, palette: v, customPalette: undefined }))} />
+                <details className="group" open={!!spec.customPalette}>
+                  <summary className="chip inline-flex cursor-pointer list-none">
+                    <Icon name="palette" size={13} className={spec.customPalette ? 'text-volt' : undefined} />
+                    {spec.customPalette ? 'Your own colours are in use' : 'Or mix your own'}
+                  </summary>
+                  <div className="mt-3">
+                    <CustomPaletteEditor
+                      value={spec.customPalette}
+                      onChange={(p: CustomPalette) => set('customPalette', p)}
+                      onClear={() => set('customPalette', undefined)}
+                    />
+                  </div>
+                </details>
+              </div>
+            )}
+
             {step.id === 'type' && <PickOne options={catalogue.typography} value={spec.typography} onChange={(v) => set('typography', v)} cols={2} compact />}
             {step.id === 'atmosphere' && <PickOne options={catalogue.atmospheres} value={spec.atmosphere} onChange={(v) => set('atmosphere', v)} cols={2} compact />}
             {step.id === 'layout' && <PickOne options={catalogue.layouts} value={spec.layout} onChange={(v) => set('layout', v)} cols={2} />}
@@ -256,11 +353,13 @@ export function Wizard() {
 
             {step.id === 'theme' && <PickOne options={catalogue.themes} value={spec.theme} onChange={(v) => set('theme', v)} cols={3} compact />}
 
-            {step.id === 'reference' && <ReferenceStep urls={spec.references ?? []} dna={spec.dna ?? []} onChange={(urls, dna: DesignDNA[]) => setSpec((s) => ({ ...s, references: urls, dna }))} />}
-
             {step.id === 'analytics' && (
               <div className="space-y-7">
                 <Group label="Analytics — choose any"><PickMany options={catalogue.analytics} value={spec.analytics ?? []} onChange={(v) => set('analytics', v)} cols={2} compact /></Group>
+                <p className="text-[12.5px] text-bone-4 measure -mt-4">
+                  Keys go in afterwards, from the project screen — nothing is asked for here that you
+                  might not have yet. The built-in one needs nothing at all.
+                </p>
                 <Group label="Where forms go"><PickOne options={catalogue.crm} value={spec.crm} onChange={(v) => set('crm', v)} cols={1} compact /></Group>
               </div>
             )}
@@ -270,6 +369,10 @@ export function Wizard() {
             {step.id === 'go' && (
               <GoStep spec={spec} plan={plan} showBrief={showBrief} setShowBrief={setShowBrief} setSpec={setSpec} folderNote={folderNote}
                 questions={questions} qBusy={qBusy} askQuestions={askQuestions} answers={answers} setAnswers={setAnswers} build={build} building={building} />
+            )}
+
+            {step.id !== 'go' && step.id !== 'details' && (
+              <StepNote value={note} onChange={setNote} step={step.short} />
             )}
           </div>
 
@@ -282,7 +385,9 @@ export function Wizard() {
           </div>
         </div>
 
-        <div className="hidden lg:block">
+        {/* Sticky, because the preview is the point: scrolling a long list of
+            options used to scroll the thing they change out of sight. */}
+        <div className="hidden lg:block sticky top-6">
           <LivePreview spec={spec} catalogue={catalogue} name={spec.name} />
           <div className="mt-4 h-1 rounded bg-ink-3 overflow-hidden"><div className="h-full bg-volt transition-all duration-500" style={{ width: `${progressPct}%` }} /></div>
         </div>
@@ -291,83 +396,106 @@ export function Wizard() {
   );
 }
 
+/**
+ * One line beside the options.
+ *
+ * Deliberately small and deliberately last: the options are the product, and a
+ * text field given equal weight would quietly turn this back into a prompt box.
+ * But "pick the closest shape" always leaves something over, and the person who
+ * knows what it is should be able to say so on the screen where they thought of
+ * it rather than in a general notes field at the end.
+ */
+function StepNote({ value, onChange, step }: { value: string; onChange: (v: string) => void; step: string }) {
+  const [open, setOpen] = useState(!!value);
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="mt-7 telemetry text-bone-3 hover:text-bone inline-flex items-center gap-1.5">
+        <Icon name="plus" size={12} /> add a note about {step.toLowerCase()}
+      </button>
+    );
+  }
+  return (
+    <div className="mt-7">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="legend">Anything else about {step.toLowerCase()}? (optional)</span>
+        {!value && <button onClick={() => setOpen(false)} className="telemetry text-bone-4 hover:text-bone">hide</button>}
+      </div>
+      <Textarea
+        rows={2}
+        placeholder="The thing the options above do not quite cover."
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <p className="telemetry text-bone-4 mt-1.5">Goes into the brief attributed to this screen, so it is read where it matters.</p>
+    </div>
+  );
+}
+
+function JumpMenu({ at, reachable, answered, onGo, onClose }: {
+  at: number; reachable: (i: number) => boolean; answered: (id: StepId) => boolean; onGo: (i: number) => void; onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [onClose]);
+  return (
+    <div ref={ref} className="absolute left-0 top-9 z-40 panel w-[280px] p-1.5 max-h-[70vh] overflow-auto shadow-2xl shadow-black/60">
+      {STEPS.map((s, i) => {
+        const can = reachable(i);
+        return (
+          <button
+            key={s.id}
+            onClick={() => onGo(i)}
+            disabled={!can}
+            className={cx(
+              'w-full text-left px-2.5 py-1.5 rounded-md text-[13px] flex items-center gap-2.5 disabled:opacity-30 disabled:cursor-default',
+              i === at ? 'bg-volt-2 text-bone' : 'text-bone-2 hover:bg-ink-3',
+            )}
+          >
+            <span className="telemetry text-bone-4 w-5 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+            <span className="flex-1 truncate">{s.short}</span>
+            {answered(s.id) && <Icon name="check" size={12} className="text-volt shrink-0" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function pick<T extends object, K extends keyof T>(o: T, keys: K[]): Partial<T> { const out: Partial<T> = {}; for (const k of keys) if (k in o) out[k] = o[k]; return out; }
+
+/**
+ * Choices taken from a reference site outrank the archetype's defaults.
+ *
+ * Pressing "restaurant" after adopting a palette used to silently throw that
+ * palette away, which reads as the tool ignoring you. The adopted list says
+ * which fields were deliberate, so only those survive.
+ */
+function adoptedOverrides(s: Draft): Partial<Draft> {
+  const adopted = new Set(s.adopted ?? []);
+  if (!adopted.size) return {};
+  const out: Partial<Draft> = { adopted: s.adopted };
+  if (adopted.has('palette')) { out.palette = s.palette; out.customPalette = s.customPalette; }
+  if (adopted.has('typography')) out.typography = s.typography;
+  if (adopted.has('atmosphere')) out.atmosphere = s.atmosphere;
+  if (adopted.has('layout')) out.layout = s.layout;
+  if (adopted.has('scene')) out.scene = s.scene;
+  if (adopted.has('motion')) {
+    out.motionIntensity = s.motionIntensity; out.scrollStyle = s.scrollStyle;
+    out.hoverStyle = s.hoverStyle; out.cursorStyle = s.cursorStyle; out.transition = s.transition;
+  }
+  if (adopted.has('signature')) out.signature = s.signature;
+  return out;
+}
 
 function orderScenes(catalogue: Catalogue, archetype?: string) {
   const fits = catalogue.scenes.filter((s) => s.suits?.includes(archetype ?? ''));
   const rest = catalogue.scenes.filter((s) => !s.suits?.includes(archetype ?? '') && s.id !== 'none');
   return [...fits, ...rest, ...catalogue.scenes.filter((s) => s.id === 'none')];
-}
-
-/**
- * The imagery question. It is asked here rather than left to the build because
- * the answer changes the design, not just the assets: a site with no
- * photographs is not a site with holes in it, it is a site that has to be
- * built out of type, colour and rule — and deciding that up front is the
- * difference between a considered page and a grid of empty rectangles.
- */
-function PicturesStep({ spec, setSpec, catalogue }: { spec: Draft; setSpec: React.Dispatch<React.SetStateAction<Draft>>; catalogue: Catalogue }) {
-  const im = spec.imagery ?? { kind: 'none' as const, instead: [] };
-  const patch = (v: Partial<typeof im>) => setSpec((s) => ({ ...s, imagery: { ...im, ...v } }));
-  const [found, setFound] = useState<{ ok: boolean; count: number; sample: string[]; reason?: string } | null>(null);
-
-  useEffect(() => {
-    if (im.kind === 'none' || !im.folder?.trim()) { setFound(null); return; }
-    const t = setTimeout(() => { api.checkMedia(im.folder!).then(setFound).catch(() => setFound(null)); }, 450);
-    return () => clearTimeout(t);
-  }, [im.kind, im.folder]);
-
-  return (
-    <div className="space-y-7">
-      <PickOne options={catalogue.imageryKinds} value={im.kind} onChange={(v) => patch({ kind: v as typeof im.kind })} cols={1} compact />
-
-      {im.kind !== 'none' && (
-        <div className="space-y-4">
-          <Labelled label="The folder they are in">
-            <Input
-              placeholder="C:\\Users\\you\\Pictures\\the-restaurant"
-              value={im.folder ?? ''}
-              onChange={(e) => patch({ folder: e.target.value })}
-            />
-          </Labelled>
-          {found && !found.ok && <p className="text-[13px] text-danger -mt-2">{found.reason}</p>}
-          {found?.ok && (
-            <p className="text-[13px] text-bone-2 -mt-2 flex items-center gap-2">
-              <Icon name="check" size={13} className="text-volt shrink-0" />
-              {found.count} file{found.count === 1 ? '' : 's'} — <span className="telemetry text-bone-4 truncate">{found.sample.join(', ')}</span>
-            </p>
-          )}
-          <p className="text-[12.5px] text-bone-4 measure -mt-2">
-            Copied into the project when it is built, never uploaded anywhere. JPEG, PNG, WebP,
-            AVIF, SVG, MP4 and WebM, one level deep.
-          </p>
-          <Labelled label="What are they of?">
-            <Input
-              placeholder="The counter at service, the oven, the team"
-              value={im.describes ?? ''}
-              onChange={(e) => patch({ describes: e.target.value })}
-            />
-          </Labelled>
-        </div>
-      )}
-
-      {im.kind !== 'have' && (
-        <Group label={im.kind === 'none' ? 'What goes where a photograph would have gone' : 'And where one is still missing'}>
-          <PickMany
-            options={catalogue.imageryDevices}
-            value={im.instead ?? []}
-            onChange={(v) => patch({ instead: v })}
-            cols={2}
-            compact
-          />
-          <p className="text-[12.5px] text-bone-4 mt-3 measure">
-            Pick none and it will choose per section. What it will never do is leave an empty
-            rounded rectangle or reach for a stock photograph — both are refusals to design.
-          </p>
-        </Group>
-      )}
-    </div>
-  );
 }
 
 function Labelled({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="legend block mb-1.5">{label}</span>{children}</label>; }
@@ -390,6 +518,7 @@ function GoStep({ spec, plan, showBrief, setShowBrief, setSpec, folderNote, ques
   questions: Question[] | null; qBusy: boolean; askQuestions: () => void; answers: Record<string, string[]>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string[]>>>; build: () => void; building: boolean;
 }) {
   const detection = useStore((s) => s.detection);
+  const notes = useMemo(() => Object.entries(spec.stepNotes ?? {}).filter(([, v]) => v.trim()), [spec.stepNotes]);
   return (
     <div className="space-y-6">
       <div className="grid sm:grid-cols-2 gap-4">
@@ -409,6 +538,21 @@ function GoStep({ spec, plan, showBrief, setShowBrief, setSpec, folderNote, ques
             </ol>
             <p className="telemetry text-bone-3 mt-3">{plan.estimate.caveat}</p>
           </div>
+
+          {notes.length > 0 && (
+            <div className="panel p-5">
+              <span className="legend block mb-2">What you said along the way</span>
+              <ul className="grid gap-1.5 text-[13px]">
+                {notes.map(([k, v]) => (
+                  <li key={k} className="flex gap-2.5">
+                    <span className="telemetry text-volt shrink-0 w-[86px] truncate">{STEPS.find((s) => s.id === k)?.short ?? k}</span>
+                    <span className="text-bone-2">{v}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="telemetry text-bone-4 mt-2">All of it reaches the brief.</p>
+            </div>
+          )}
 
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="opt flex items-start gap-3 cursor-pointer" data-on={spec.review !== false}>

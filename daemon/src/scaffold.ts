@@ -37,7 +37,12 @@ function copyTree(from: string, to: string) {
 /** `design.config.ts`, written from the spec so every component reads the choices. */
 export function designConfigSource(spec: Spec): string {
   const palette = PALETTES.find((p) => p.id === spec.palette) ?? PALETTES[0];
-  const [bg, fg, accent, muted, surface] = palette.swatch ?? ['#0A0B0D', '#EDE9E0', '#C8FF3D', '#6C6F78', '#15171B'];
+  const chosen = palette.swatch ?? ['#0A0B0D', '#EDE9E0', '#C8FF3D', '#6C6F78', '#15171B'];
+  // Colours the person mixed themselves win over the palette they started from.
+  // The palette id is still kept in the spec, so clearing the custom five falls
+  // back to a real contrast-checked set rather than to nothing.
+  const c = spec.customPalette;
+  const [bg, fg, accent, muted, surface] = c ? [c.bg, c.fg, c.accent, c.muted, c.surface] : chosen;
   const type = TYPE_DIRECTION[spec.typography] ?? TYPE_DIRECTION.grotesk;
   const light = isLight(bg);
   // A second theme derived honestly: swap ground and ink, keep the accent.

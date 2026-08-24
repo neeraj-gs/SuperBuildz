@@ -31,7 +31,7 @@ import { deployStatus, vercelLogin, deployProject, setEnvValue } from './deploy.
 import { judge, hookResponse } from './policy.ts';
 import { tweakState, setTweaks, shufflePalette } from './tweaks.ts';
 import { proposeDirections, readDirections, chooseDirection } from './directions.ts';
-import { checkMediaFolder } from './media.ts';
+import { checkMediaFolder, newUploadFolder, saveUpload, removeUpload, fetchImages, listUploads } from './media.ts';
 import { listDir, readProjectFile, writeProjectFile, createProjectFile, deleteProjectFile, revertProjectFile, searchProject } from './files.ts';
 import { adminLogin, setAdminPassword, setAdminEmail, forgetDevPassword } from './admin.ts';
 import { analyticsState, setAnalytics, setAnalyticsKeys } from './analytics.ts';
@@ -123,6 +123,32 @@ app.post('/api/folder/check', async (req) => folderIsUsable(String((req.body as 
 // A folder of photographs is not a project folder: it exists, it is not empty,
 // and what matters is what is in it.
 app.post('/api/media/check', async (req) => checkMediaFolder(String((req.body as { path?: string })?.path ?? '')));
+/* Pictures: a folder, a drop, or a link. All three land in one staging folder. */
+
+app.post('/api/media/folder', async () => ({ folder: newUploadFolder() }));
+app.get('/api/media/list', async (req, reply) => {
+  try { return { files: listUploads(String((req.query as { folder?: string }).folder ?? '')) }; }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+// One file per request with a bigger ceiling than the rest of the API: a photograph
+// is two orders of magnitude larger than any other body this daemon accepts, and
+// raising the global limit to suit it would raise it for every other route too.
+app.post('/api/media/upload', { bodyLimit: 28 * 1024 * 1024 }, async (req, reply) => {
+  const { folder, name, data } = (req.body ?? {}) as { folder?: string; name?: string; data?: string };
+  try { return saveUpload(String(folder ?? ''), String(name ?? ''), String(data ?? '')); }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.post('/api/media/remove', async (req, reply) => {
+  const { folder, name } = (req.body ?? {}) as { folder?: string; name?: string };
+  try { return removeUpload(String(folder ?? ''), String(name ?? '')); }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.post('/api/media/fetch', async (req, reply) => {
+  const { folder, urls } = (req.body ?? {}) as { folder?: string; urls?: string[] };
+  try { return { results: await fetchImages(String(folder ?? ''), (urls ?? []).map(String)) }; }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+
 app.post('/api/plan', async (req) => planFor(completeSpec((req.body ?? {}) as Partial<Spec>)));
 app.post('/api/questions', async (req, reply) => {
   const spec = completeSpec((req.body ?? {}) as Partial<Spec>);

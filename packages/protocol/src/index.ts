@@ -150,7 +150,49 @@ export interface DesignDNA {
   hero: string;
   keep: string[];
   avoid: string[];
+  /**
+   * The nearest catalogue entry for each choice the wizard is about to ask.
+   *
+   * Prose about a reference site is interesting and unusable: it cannot
+   * pre-select anything. Asking the same bounded turn that reads the
+   * screenshots to also name the closest option costs nothing extra and turns
+   * "here is what I saw" into "here is your site, already answered" — which
+   * the person then disagrees with, piece by piece, which is the whole design
+   * of this product.
+   */
+  suggests?: DnaSuggestion;
+  /** The site's own colours, sampled, offered as a custom palette. */
+  customPalette?: CustomPalette;
 }
+
+/** Catalogue ids the extraction thinks this reference is closest to. */
+export interface DnaSuggestion {
+  palette?: string;
+  typography?: string;
+  atmosphere?: string;
+  layout?: string;
+  scene?: string;
+  motionIntensity?: string;
+  scrollStyle?: string;
+  hoverStyle?: string;
+  cursorStyle?: string;
+  transition?: string;
+  theme?: string;
+  /** The one memorable move, as a signature id or a sentence. */
+  signature?: string;
+}
+
+/** Five colours, chosen rather than picked from a list. */
+export interface CustomPalette {
+  bg: string;
+  fg: string;
+  accent: string;
+  muted: string;
+  surface: string;
+}
+
+/** Which parts of a reference the person chose to carry across. */
+export type DnaPart = 'palette' | 'typography' | 'atmosphere' | 'layout' | 'scene' | 'motion' | 'signature';
 
 export interface ReferenceCapture {
   id: string;
@@ -213,6 +255,27 @@ export interface Spec {
   dna?: DesignDNA[];
   assets: string[];
   notes?: string;
+
+  /**
+   * Colours chosen rather than picked. Overrides `palette` when present.
+   * Kept beside the palette id rather than replacing it so that clearing the
+   * custom colours falls back to a real, contrast-checked palette instead of
+   * to nothing.
+   */
+  customPalette?: CustomPalette;
+
+  /**
+   * What the person typed beside the options, per step.
+   *
+   * Every screen is answerable by pressing, and every screen now also has one
+   * line to say the thing no list contains. Keyed by step id so the brief can
+   * attribute it — "on colour, they said..." carries more than the same
+   * sentence in a general notes field.
+   */
+  stepNotes?: Record<string, string>;
+
+  /** Which parts of the reference site were adopted, per reference index. */
+  adopted?: string[];
 
   /**
    * What imagery exists. Everything a site shows has to come from somewhere,
