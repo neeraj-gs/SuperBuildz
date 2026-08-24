@@ -17,7 +17,8 @@ export function Kanban({ leads, stages }: { leads: Lead[]; stages: Stage[] }) {
   };
   const fmt = (n: number) => (n ? n.toLocaleString() : '');
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(200px, 1fr))`, overflowX: 'auto' }}>
+    <div className="admin-board">
+    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(230px, 1fr))` }}>
       {stages.map((s) => {
         const col = items.filter((l) => l.stage === s.id);
         const total = col.reduce((n, l) => n + (l.value || 0), 0);
@@ -39,6 +40,7 @@ export function Kanban({ leads, stages }: { leads: Lead[]; stages: Stage[] }) {
           </div>
         );
       })}
+    </div>
     </div>
   );
 }

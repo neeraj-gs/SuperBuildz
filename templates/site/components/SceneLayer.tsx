@@ -35,6 +35,22 @@ import { design } from '@/design.config';
 import type { SceneProps } from '@/components/scenes/_shared';
 import { paletteFor, type Theme } from '@/lib/tokens';
 import { SCENE_LOADERS } from '@/components/scenes/loaders';
+import { usePathname } from 'next/navigation';
+
+/**
+ * The site's chrome does not belong on the CRM.
+ *
+ * The root layout wraps every route, /admin included, so the full-page 3D
+ * layer, the custom cursor and Lenis smooth scroll were all running behind a
+ * dashboard — which looked like the scene leaking through the gaps between the
+ * cards, felt like the page fighting the scroll wheel, and put a floating dot
+ * over a table of somebody's customers. A dashboard is a tool and wants none of
+ * it; the CRM draws its own contained, dimmed scene in its own hero instead.
+ */
+function useOnAdmin(): boolean {
+  const path = usePathname();
+  return !!path?.startsWith('/admin');
+}
 
 export function SceneLayer({
   component = design.scene.component,
@@ -42,6 +58,7 @@ export function SceneLayer({
   poster = '/scene-poster.svg',
   className = '',
 }: { component?: string; name?: string; poster?: string; className?: string }) {
+  const onAdmin = useOnAdmin();
   const [ready, setReady] = useState(false);
   const [awake, setAwake] = useState(true);
   const [reduced, setReduced] = useState(false);
@@ -144,6 +161,10 @@ export function SceneLayer({
   const heavy = design.scene.weight === 'heavy';
   const dpr: [number, number] = heavy && portrait ? [0.75, 1] : [1, 2];
   const show = ready && !reduced && webgl;
+
+  // Every hook above has run, so this early return is safe: the layer simply
+  // is not part of the CRM.
+  if (onAdmin) return null;
 
   return (
     <div

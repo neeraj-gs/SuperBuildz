@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { design } from '@/design.config';
 
 /**
@@ -8,8 +9,26 @@ import { design } from '@/design.config';
  * ScrollTrigger reads the same position. Off under reduced motion and on
  * touch, where native feels better. Also fires scroll_depth at 25/50/75/100.
  */
+/**
+ * The site's chrome does not belong on the CRM.
+ *
+ * The root layout wraps every route, /admin included, so the full-page 3D
+ * layer, the custom cursor and Lenis smooth scroll were all running behind a
+ * dashboard — which looked like the scene leaking through the gaps between the
+ * cards, felt like the page fighting the scroll wheel, and put a floating dot
+ * over a table of somebody's customers. A dashboard is a tool and wants none of
+ * it; the CRM draws its own contained, dimmed scene in its own hero instead.
+ */
+function useOnAdmin(): boolean {
+  const path = usePathname();
+  return !!path?.startsWith('/admin');
+}
+
 export function SmoothScroll() {
+  const onAdmin = useOnAdmin();
   useEffect(() => {
+    // Nothing hijacks the scroll wheel on a tool.
+    if (onAdmin) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const touch = window.matchMedia('(hover: none)').matches;
     let cleanup = () => {};
@@ -28,7 +47,7 @@ export function SmoothScroll() {
       return () => { cancelled = true; cleanup(); };
     }
     return cleanup;
-  }, []);
+  }, [onAdmin]);
 
   useEffect(() => {
     const marks = new Set<number>();

@@ -18,7 +18,8 @@ and it outranks taste. Skills with reference knowledge live in `.claude/skills/`
 | Form controls | `components/ui/Controls.tsx` | `Select` and `DateField`. Never a native `<select>` or `<input type="date">`: they render the OS widget in the OS locale. |
 | Analytics | `lib/analytics.ts` (`track()`), `lib/analytics-client.tsx` (providers) | Every event goes through `track()`. Funnel events are named in BRIEF.md. |
 | Forms | `<Form name="…">` → `app/api/forms/[form]/route.ts` | Validated with zod, rate-limited, honeypot. Lands as a lead + activity. |
-| CRM | `app/admin/**` | Login in `app/admin/login`, auth in `lib/auth.ts`. Pipeline stages in `db/pipeline.ts`, KPIs in `app/admin/kpis.ts`. It wears the site's tokens — check it after restyling. |
+| CRM | `app/admin/**` | Login in `app/admin/login`, auth in `lib/auth.ts`. Every number is computed in one pass by `db/metrics.ts`; the charts are server-rendered SVG in `app/admin/charts.tsx`. Pipeline stages in `db/pipeline.ts`. It wears the site's tokens — check it after restyling. |
+| Chart colour | `lib/ramp.ts` → `--chart-1..5`, `--chart-accent` | One accent, so every scale is sequential: magnitude is lightness, identity is a label. Never a second y-axis, never a number on every point, never a value only reachable by hovering. Every chart has a table twin. |
 | Database | `db/` (Drizzle) | `node:sqlite` locally (`data/site.db`), Postgres when `DATABASE_URL` is set. Schema in `db/schema.ts` and `db/sql.ts` (DDL, both dialects). Never build SQL from strings. |
 | Security headers | `next.config.ts` | CSP allows only the analytics chosen. Do not loosen without a reason in README.md. |
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { design } from '@/design.config';
 
 /**
@@ -8,8 +9,24 @@ import { design } from '@/design.config';
  * interactive things, a lagging ring, or a label that says what will happen
  * (from data-cursor on the element). Hidden on touch.
  */
+/**
+ * The site's chrome does not belong on the CRM.
+ *
+ * The root layout wraps every route, /admin included, so the full-page 3D
+ * layer, the custom cursor and Lenis smooth scroll were all running behind a
+ * dashboard — which looked like the scene leaking through the gaps between the
+ * cards, felt like the page fighting the scroll wheel, and put a floating dot
+ * over a table of somebody's customers. A dashboard is a tool and wants none of
+ * it; the CRM draws its own contained, dimmed scene in its own hero instead.
+ */
+function useOnAdmin(): boolean {
+  const path = usePathname();
+  return !!path?.startsWith('/admin');
+}
+
 export function Cursor() {
-  const kind = design.motion.cursor;
+  // A dashboard wants the pointer it came with.
+  const kind = useOnAdmin() ? 'system' : design.motion.cursor;
   const dot = useRef<HTMLDivElement>(null);
   const ring = useRef<HTMLDivElement>(null);
   const [label, setLabel] = useState('');

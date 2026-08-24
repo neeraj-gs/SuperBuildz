@@ -13,7 +13,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 const home = mkdtempSync(join(tmpdir(), 'superbuilds-test-'));
 const files = readdirSync(here).filter((f) => f.endsWith('.test.ts')).map((f) => join(here, f));
 
-const res = spawnSync(process.execPath, ['--test', ...files], {
+// The chart ramp is tested from here but lives in templates/site, whose
+// package.json has no module type because a Next project does not need one.
+// Node warns about that on every run; the warning is not about our code.
+const res = spawnSync(process.execPath, ['--disable-warning=MODULE_TYPELESS_PACKAGE_JSON', '--test', ...files], {
   stdio: 'inherit',
   env: { ...process.env, SUPERBUILDS_HOME: home, SUPERBUILDS_SITES: join(home, 'sites') },
 });

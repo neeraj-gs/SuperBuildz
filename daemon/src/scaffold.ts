@@ -66,6 +66,8 @@ export const design = {
    * for a restaurant in Lisbon must not ask for a date in mm/dd/yyyy.
    */
   locale: ${JSON.stringify(localeFor(spec.details?.location))},
+  /** What money is counted in, derived from the locale. The CRM formats with it. */
+  currency: ${JSON.stringify(currencyFor(localeFor(spec.details?.location)))},
   theme: ${JSON.stringify(spec.theme)} as 'dark' | 'light' | 'both',
   palette: {
     id: ${JSON.stringify(palette.id)},
@@ -154,6 +156,29 @@ function signatureSentence(value: string | undefined): string {
  * every country right, because it is the difference between a date a European
  * can read and one they cannot.
  */
+/**
+ * The currency a locale spends in.
+ *
+ * The CRM shows money — an open pipeline, a value won — and a Lisbon
+ * restaurant seeing dollars is a tell that the whole thing was built for
+ * somebody else. Region first, because language does not decide this: pt-PT is
+ * euros and pt-BR is reais, and de-CH is neither.
+ */
+export function currencyFor(locale: string): string {
+  const region = locale.split('-')[1]?.toUpperCase() ?? '';
+  const byRegion: Record<string, string> = {
+    GB: 'GBP', US: 'USD', CA: 'CAD', AU: 'AUD', NZ: 'NZD', IN: 'INR', JP: 'JPY', CN: 'CNY',
+    CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN', CZ: 'CZK', HU: 'HUF', RO: 'RON',
+    BR: 'BRL', MX: 'MXN', AR: 'ARS', CL: 'CLP', CO: 'COP', ZA: 'ZAR', NG: 'NGN', KE: 'KES',
+    AE: 'AED', SA: 'SAR', IL: 'ILS', TR: 'TRY', RU: 'RUB', KR: 'KRW', SG: 'SGD', HK: 'HKD',
+    TH: 'THB', ID: 'IDR', MY: 'MYR', PH: 'PHP', VN: 'VND', TW: 'TWD',
+  };
+  if (byRegion[region]) return byRegion[region];
+  // Everything left in the table this file already keeps is in the eurozone.
+  const euro = new Set(['PT', 'ES', 'FR', 'DE', 'AT', 'NL', 'BE', 'IT', 'IE', 'FI', 'GR', 'SK', 'SI', 'EE', 'LV', 'LT', 'LU', 'MT', 'CY', 'HR']);
+  return euro.has(region) ? 'EUR' : 'EUR';
+}
+
 export function localeFor(location?: string): string {
   const l = (location ?? '').toLowerCase();
   const table: Array<[RegExp, string]> = [

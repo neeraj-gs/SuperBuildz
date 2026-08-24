@@ -241,6 +241,56 @@ port flag is `-p`, and a revamped site is whatever somebody already had — Vite
 and Astro want `--port`, and passing the wrong one makes the server exit with a
 usage message that reads like our bug.
 
+## 5e. The CRM, and why its charts are hand-written
+
+The dashboard is half of what the tool makes and it is opened far more often
+than the site. It was a grey table with four numbers on it.
+
+**`db/metrics.ts`** computes everything in one pass. Twelve queries for twelve
+panels is twelve round trips and twelve chances for two panels to disagree
+about what "the last 30 days" means; the rows come back once and everything is
+derived in JavaScript, which also keeps it dialect-neutral between the local
+SQLite file and Postgres on a host.
+
+**`app/admin/charts.tsx`** is a chart kit in one file: trend, ranked bars,
+funnel with drop-off, part-to-whole, heatmap, stat tile, meter, sparkline. All
+server components — the page ships as markup with nothing to hydrate. A charting
+library would be 60–200KB of client bundle to draw six shapes that are twenty
+lines of SVG each, and it would arrive with a palette that has nothing to do
+with this site.
+
+### One accent, so every scale is sequential
+
+This dashboard cannot have a fixed eight-hue categorical palette, because its
+colours belong to a site whose accent somebody picked — or mixed — an hour ago,
+on a ground that might be near-black or near-white. So the rule is: **magnitude
+is lightness, identity is a label.** No chart carries meaning in hue alone, no
+chart has two y-axes, no chart puts a number on every point, and every chart has
+a table twin so nothing is reachable only by hovering.
+
+**`lib/ramp.ts`** solves the scale rather than choosing it: given the accent and
+the surface, it walks OKLab lightness towards the surface and stops at the last
+step that still clears 2:1 contrast, in whichever direction has room. Four or
+five steps depending on what the ground will carry, adjacent steps at least 0.06
+apart in L. The accent leads its own ramp wherever there is room for it. It is
+computed at render time rather than baked into `design.config.ts`, so it follows
+the theme *and* the tune panel.
+
+`daemon/test/charts.test.ts` runs both checks against every palette in the
+catalogue and against thirty-six arbitrary accents on both grounds — the first
+version of the solver ran the ramp in the wrong direction and produced four
+shades of near-black from a lime, which no amount of looking at one palette
+would have caught.
+
+### Three bugs the dashboard exposed in the site
+
+The root layout wraps every route, `/admin` included, so the full-page 3D layer,
+the custom cursor and Lenis smooth scroll were all running behind the CRM. Worse,
+`body` was `transparent` and the *only* thing painting the page's ground was that
+fixed scene layer — so removing it from `/admin` revealed there had never been a
+background at all. All three are fixed at the source: the three components step
+aside on `/admin`, and the page now has a ground of its own.
+
 ## 6. The chat after generation
 
 The same session continues as a conversation: a message, a streamed reply,

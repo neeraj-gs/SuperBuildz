@@ -10,6 +10,8 @@ export const design = {
   archetype: 'other',
   /** BCP-47. Every date, time and number on the site is formatted against it. */
   locale: 'en-GB',
+  /** What money is counted in. The CRM formats every figure with it. */
+  currency: 'GBP',
   theme: 'dark' as 'dark' | 'light' | 'both',
   palette: {
     id: 'ink',

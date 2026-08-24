@@ -28,7 +28,16 @@ html { scroll-behavior: auto; }
   scene sets `--bg` on `.scene-layer` and looks identical.
 */
 body {
-  background: transparent;
+  /*
+    The ground, and not the scene's job.
+
+    This used to be `transparent`, with the fixed scene layer painting the only
+    colour on the page. That is fine until the layer is not there — no WebGL,
+    reduced motion, or a route like /admin that does not want a scene — and then
+    the site is bone-coloured text on the browser's default white. The scene
+    still paints over this; it is now a floor rather than the only floor.
+  */
+  background: var(--bg);
   color: var(--fg);
   font-family: var(--font-body);
   font-size: var(--body-size);

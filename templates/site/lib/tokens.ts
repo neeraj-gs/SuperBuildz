@@ -13,6 +13,7 @@
 import { design } from '@/design.config';
 import { fontFamilies } from '@/app/fonts';
 import rawTweaks from '@/design.tweaks.json';
+import { chartRamp } from '@/lib/ramp';
 
 export type Theme = 'dark' | 'light';
 
@@ -116,6 +117,17 @@ export function cssVariables(theme: Theme): Record<string, string> {
     '--stagger': `${Math.round(t.stagger ?? design.motion.stagger)}ms`,
     '--rise': px(t.rise ?? design.motion.rise),
 
+    /*
+      The chart scale, solved from the live palette rather than written down.
+
+      The CRM has exactly one accent because it belongs to this site, so every
+      scale in it is sequential: magnitude is lightness, identity is a label,
+      and there is no categorical palette to get wrong. `--chart-accent` is the
+      accent itself, for a single-series mark; `--chart-1` to `--chart-5` are
+      the ordered steps, strongest first, for anything that ranks. See lib/ramp.ts.
+    */
+    ...chartVariables(p),
+
     '--grain': String(t.grain ?? 0),
     '--scene-tint': String(t.sceneDim ?? 0),
     '--scene-brightness': String(t.sceneBrightness ?? 1),
@@ -127,3 +139,26 @@ export function styleAttribute(theme: Theme): string {
 }
 
 export const tokens = design;
+
+
+/**
+ * The chart scale as CSS variables.
+ *
+ * Fewer than five steps is a legitimate answer on a ground with no lightness
+ * room, so the unused ones are aliased to the faintest rather than left
+ * undefined — a chart asking for `--chart-5` on such a page gets the faintest
+ * step instead of nothing at all.
+ */
+function chartVariables(p: { accent: string; surface: string; fg: string }): Record<string, string> {
+  const ramp = chartRamp(p.accent, p.surface, p.fg);
+  const out: Record<string, string> = {
+    '--chart-accent': p.accent,
+    '--chart-grid': ramp.grid,
+    '--chart-good': ramp.good,
+    '--chart-warn': ramp.warn,
+    '--chart-bad': ramp.bad,
+    '--chart-steps': String(ramp.steps.length),
+  };
+  for (let i = 0; i < 5; i++) out[`--chart-${i + 1}`] = ramp.steps[Math.min(i, ramp.steps.length - 1)];
+  return out;
+}

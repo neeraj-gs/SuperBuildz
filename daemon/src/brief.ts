@@ -397,7 +397,17 @@ export const STAGES: StageDef[] = [
     prompt: (spec) => [
       `Stage 4 of ${spec.review ? 5 : 4}: the CRM and analytics.`, '', PREAMBLE, '',
       spec.crm === 'custom'
-        ? 'Map every form to a pipeline stage in `db/pipeline.ts` and name the stages for this business. Define the KPIs in `app/admin/kpis.ts` (four cards, each with a target and a trend) so they mean something here. Make sure `/admin` wears the site\'s tokens — open `npm run shot -- /admin` and look. Seed nothing fake; the dashboard must be honest when empty and say what will appear there.'
+        ? [
+          'The CRM already has the machinery: every number is computed in one pass by `db/metrics.ts`, the charts are server-rendered SVG in `app/admin/charts.tsx`, and the colours come from `lib/ramp.ts`. You are not building a dashboard from nothing — you are making the one that is there mean something for *this* business.',
+          '',
+          '1. **Name the pipeline for this business** in `db/pipeline.ts`. A restaurant has "Booking requested → Confirmed → Seated → No-show", a builder has "Enquiry → Surveyed → Quoted → Won", a studio has "Brief → Proposal → Retained". Keep the ids stable and mark which stages count as won and lost. Map every form on the site to the stage it should land in.',
+          '2. **Rewrite the headline numbers on `/admin` for this trade.** The four tiles at the top and the four below them are generic on purpose; replace them with the numbers whose owner would check them daily. Covers this week against a target. No-shows. Average spend. Repeat customers. Each tile needs a target somebody could actually hit and a sentence saying what it is.',
+          '3. **Say what each figure means in the person\'s own words.** Every `Figure` takes a `note`. Use it. "Where people stop" is more use than "Funnel", and the owner of this business has never read the word "conversion".',
+          '4. **Leave the chart rules alone.** One accent, so every scale is sequential: magnitude is lightness, identity is a label. Never a second y-axis. Never a number on every point. Every chart keeps its table twin. If you need a form that is not in `charts.tsx`, add it there in the same style rather than inlining an SVG in a page.',
+          '5. **Seed nothing.** An empty dashboard must be honest and say what will appear there and when.',
+          '',
+          'Then look at it: `npm run shot -- /admin` and `npm run shot -- /admin/analytics`, and read both. It must wear the site\'s tokens, and it must be legible — a dashboard that is beautiful and unreadable is one nobody opens twice.',
+        ].join('\n')
         : 'Confirm the forms reach their destination as the brief says and remove the CRM routes if they are not wanted.',
       `Wire analytics as the brief says (${spec.analytics.map((a) => label(ANALYTICS, a)).join(', ')}) through \`lib/analytics.ts\` so every \`track()\` reaches every provider chosen. Instrument the funnel events named in the brief.`,
       'Submit a test lead through the real contact form with `npm run test:forms` and confirm it appears in `/admin/leads`. Run `npm run build`.',
@@ -410,6 +420,7 @@ export const STAGES: StageDef[] = [
       'You are now the jury, and you are a harsh one. Take fresh screenshots of every page at desktop and 390px (`npm run shot -- --all`) and read every one of them. Score the site 1–5 against each line of the rubric in BRIEF.md, honestly, in a table in `REVIEW.md`. Scoring your own work 4 everywhere is the failure mode of this stage; find the three worst things and say so plainly.',
       'Look for these specifically, because they are what the last builds got wrong: a scene that dies after the first viewport; sections that are empty rounded rectangles where a picture should be; a native select or `mm/dd/yyyy` date input in a form; a hero whose subject is cropped out of frame at 390px; a page whose only motion is things fading in; and no signature move at all.',
       'For every line under 4, fix it now — the hero first, then the signature move, then the scene through the page, then imagery, then scroll craft, then 3D meaning, then the idea, then motion, then type, then palette. Re-shoot and re-score after fixing.',
+      'Then the CRM, which is half of what you built and gets looked at more often than the site: shoot `/admin` and `/admin/leads` and read them. Are the headline numbers the ones this owner would check daily, or the generic ones? Does every chart say what it means in their words? Is the empty state honest? Does it wear the site\'s own colours and type?',
       'Then the security list: grep the client bundle for any secret name, confirm headers in `next.config.ts`, confirm `/admin` needs a session, confirm rate limits and validation on every intake route, confirm `robots.txt` excludes `/admin`.',
       'Finish with the final scores and what changed.',
     ].join('\n'),
@@ -468,7 +479,7 @@ export const CHANGES: Choice[] = [
   { id: 'fix', label: 'Something is wrong', icon: 'alert', blurb: 'It looks broken, or does not work' },
   { id: 'faster', label: 'Make it faster', icon: 'bolt', blurb: 'Images, fonts, whatever is slowing it down' },
   { id: 'mobile', label: 'Check it on a phone', icon: 'phone', blurb: 'Screenshots at 390px and fixes' },
-  { id: 'crm', label: 'Change the CRM', icon: 'grid', blurb: 'Stages, KPIs, what the dashboard shows' },
+  { id: 'crm', label: 'Change the CRM', icon: 'grid', blurb: 'Stages, the numbers on the dashboard, what each chart says' },
 ];
 
 const CHANGE_DIRECTION: Record<string, string> = {
