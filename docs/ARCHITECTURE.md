@@ -204,6 +204,43 @@ decides what gets built and cannot be read is a document nobody can argue with.
 panel — the routes were already covered by `shot.mjs`, and every recent bug has
 been behind a button.
 
+## 5d. Revamping a site that already exists
+
+The second way in. A new build starts from a template and invents a business;
+a revamp starts from a business and replaces the design. Everything between
+those two ends is identical — the same eighteen questions, the same three
+directions, the same tune panel, the same chat — because there is one product
+here, not two, and what a person is choosing between is where the words come
+from.
+
+**`daemon/src/survey.ts`** establishes everything knowable without a model:
+framework, router, routes, whether it is a git repository, whether the tree is
+clean, how many images, and the site's own words sieved out of its source.
+Pointing an agent at a folder and asking "what is this" burns twenty tool calls
+rediscovering facts a hundred lines of `readdir` know exactly.
+
+Public routes and routes behind a login are kept apart. A marketing page wants
+a redesign; a table of somebody's customers wants the new colours and its layout
+left alone, and conflating the two is how a revamp puts a full-bleed hero on the
+page where the owner reads their bookings.
+
+**`daemon/src/revamp.ts`** asks the one question the survey cannot — what is
+this business, and which of our options would its owner have picked — and gets
+back both prose and catalogue ids, so the wizard opens already answered. It also
+owns `prepareRevamp` (a repository, a commit of whatever was lying around on
+*their* branch, then `superbuilds/revamp`), the five stage prompts, and
+`REVAMP.md`, which leads with the constraints rather than the ambitions because
+on somebody's live site the constraints *are* the ambitious part.
+
+`generate.ts` branches on `spec.mode`: stage zero is a branch instead of a
+scaffold, and everything after it is the ordinary stage loop, the ordinary
+session and the ordinary chat.
+
+`preview.ts` grew a `devCommand()`: generated sites are always Next, where the
+port flag is `-p`, and a revamped site is whatever somebody already had — Vite
+and Astro want `--port`, and passing the wrong one makes the server exit with a
+usage message that reads like our bug.
+
 ## 6. The chat after generation
 
 The same session continues as a conversation: a message, a streamed reply,

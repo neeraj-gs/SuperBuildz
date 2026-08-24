@@ -46,6 +46,7 @@ export function Dashboard() {
               <Seg on={view === 'list'} onClick={() => setView('list')} title="List"><Icon name="list" size={14} /></Seg>
             </div>
           )}
+          <Button icon="refresh" onClick={() => navigate({ name: 'revamp' })}>Revamp a site I have</Button>
           <Button variant="primary" icon="plus" onClick={() => navigate({ name: 'new' })}>New site</Button>
         </div>
       </div>
@@ -54,9 +55,14 @@ export function Dashboard() {
         <div className="mt-10">
           <Empty
             icon="cube"
-            title="Nothing built yet."
-            body="Press New site. The first one takes about fifteen minutes and you can watch the whole thing happen."
-            action={<Button variant="primary" iconRight="arrowRight" onClick={() => navigate({ name: 'new' })}>Start</Button>}
+            title="Nothing here yet."
+            body="Start something from nothing, or point at a site you already have and change how it looks. Either way the first one takes about fifteen minutes and you can watch the whole thing happen."
+            action={(
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button variant="primary" iconRight="arrowRight" onClick={() => navigate({ name: 'new' })}>Build something new</Button>
+                <Button icon="refresh" onClick={() => navigate({ name: 'revamp' })}>Revamp a site I have</Button>
+              </div>
+            )}
           />
         </div>
       ) : view === 'list' ? (

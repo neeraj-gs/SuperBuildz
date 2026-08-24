@@ -36,6 +36,8 @@ import { listDir, readProjectFile, writeProjectFile, createProjectFile, deletePr
 import { adminLogin, setAdminPassword, setAdminEmail, forgetDevPassword } from './admin.ts';
 import { analyticsState, setAnalytics, setAnalyticsKeys } from './analytics.ts';
 import { engineInfo, setBrief } from './engine.ts';
+import { surveySite } from './survey.ts';
+import { understandPrompt, UNDERSTAND_SCHEMA, revampPlan } from './revamp.ts';
 import { execPlain } from './binaries.ts';
 import { superbuildsHome, uiDist } from './paths.ts';
 
@@ -149,7 +151,57 @@ app.post('/api/media/fetch', async (req, reply) => {
   catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
 });
 
-app.post('/api/plan', async (req) => planFor(completeSpec((req.body ?? {}) as Partial<Spec>)));
+/* Revamping a site that already exists */
+
+app.post('/api/revamp/survey', async (req) => surveySite(String((req.body as { path?: string })?.path ?? '')));
+
+/**
+ * The one question the survey cannot answer: what is this business.
+ *
+ * Read and Glob are allowed because a route list is not the same as reading
+ * the pages. Nothing may write, and .env is refused by the same PreToolUse
+ * hook that guards every other session — the point of a revamp is that their
+ * keys stay theirs, including from us.
+ */
+app.post('/api/revamp/understand', async (req, reply) => {
+  const { path, shots } = (req.body ?? {}) as { path?: string; shots?: string[] };
+  const survey = await surveySite(String(path ?? ''));
+  if (!survey.ok) return reply.code(400).send({ error: survey.reason });
+  try {
+    const understanding = await askOnce<Record<string, unknown>>({
+      cwd: survey.path,
+      // The wizard holds served paths (/captures/<id>/shot-0.png); Read needs
+      // the file on disk. Anything that is not one of ours is dropped rather
+      // than turned into a path traversal.
+      prompt: understandPrompt(survey, (shots ?? []).map(String).flatMap((s) => {
+        const m = /^\/captures\/([A-Za-z0-9-]{1,64})\/([A-Za-z0-9._-]{1,64})$/.exec(s);
+        return m ? [join(capturesDir(), m[1], m[2])] : [];
+      })),
+      schema: UNDERSTAND_SCHEMA,
+      model: 'sonnet',
+      maxBudgetUsd: 1.5,
+      allowedTools: ['Read', 'Glob', 'Grep'],
+      timeoutMs: 300_000,
+    });
+    return { survey, understanding };
+  } catch (err) {
+    // A failed reading is not a failed revamp: the survey alone is enough to
+    // open the wizard, and every answer is one somebody can give themselves.
+    return reply.code(200).send({ survey, error: (err as Error).message });
+  }
+});
+
+app.post('/api/plan', async (req, reply) => {
+  const spec = completeSpec((req.body ?? {}) as Partial<Spec>);
+  // A revamp is planned against the site that is actually there, so the stages,
+  // the estimate and the brief all come from the survey rather than the template.
+  if (spec.mode === 'revamp') {
+    const survey = await surveySite(spec.folder);
+    if (!survey.ok) return reply.code(400).send({ error: survey.reason });
+    return revampPlan(spec, survey);
+  }
+  return planFor(spec);
+});
 app.post('/api/questions', async (req, reply) => {
   const spec = completeSpec((req.body ?? {}) as Partial<Spec>);
   const dir = join(superbuildsHome(), 'scratch'); mkdirSync(dir, { recursive: true });
@@ -174,6 +226,15 @@ app.post('/api/projects', async (req, reply) => {
   const spec = completeSpec((req.body ?? {}) as Partial<Spec>);
   if (!spec.name.trim()) return reply.code(400).send({ error: 'Give it a name first.' });
   const folder = spec.folder?.trim() || folderFor(spec.name);
+
+  if (spec.mode === 'revamp') {
+    // The opposite requirement: it has to be a website already, and an empty
+    // folder is the failure rather than the prerequisite.
+    const survey = await surveySite(folder);
+    if (!survey.ok) return reply.code(400).send({ error: survey.reason });
+    return createProject({ ...spec, folder: resolve(folder) });
+  }
+
   const usable = folderIsUsable(folder);
   if (!usable.ok) return reply.code(400).send({ error: usable.reason });
   return createProject({ ...spec, folder: resolve(folder) });

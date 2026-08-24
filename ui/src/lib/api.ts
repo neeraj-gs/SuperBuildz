@@ -5,7 +5,7 @@
 
 import type {
   Catalogue, Detection, InstallRecipeView, Plan, Project, Session, Spec, GenerationState, PreviewState, DeployState,
-  ReferenceCapture, Choice, TweakState, Tweaks, Direction, FileEntry, FileBody, AdminLogin, AnalyticsState, EngineInfo,
+  ReferenceCapture, Choice, TweakState, Tweaks, Direction, FileEntry, FileBody, AdminLogin, AnalyticsState, EngineInfo, SiteSurvey, Understanding,
 } from '@superbuilds/protocol';
 
 let token = '';
@@ -59,6 +59,10 @@ export const api = {
   plan: (spec: Partial<Spec>) => post<Plan>('/api/plan', spec),
   questions: (spec: Partial<Spec>) => post<{ questions: Question[]; error?: string }>('/api/questions', spec),
   names: (spec: Partial<Spec>) => post<{ names: Array<{ name: string; why?: string }>; error?: string }>('/api/names', spec),
+
+  /* Revamping a site that already exists */
+  survey: (path: string) => post<SiteSurvey>('/api/revamp/survey', { path }),
+  understand: (path: string, shots: string[] = []) => post<{ survey: SiteSurvey; understanding?: Understanding; error?: string }>('/api/revamp/understand', { path, shots }),
 
   projects: () => get<Project[]>('/api/projects'),
   project: (id: string) => get<Project>(`/api/projects/${id}`),

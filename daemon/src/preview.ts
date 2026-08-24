@@ -8,6 +8,8 @@
 
 import type { ChildProcess } from 'node:child_process';
 import type { PreviewState } from '@superbuilds/protocol';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { spawnBin, execPlain } from './binaries.ts';
 import { portFor, portEnv, releasePort } from './ports.ts';
 import { broadcast } from './bus.ts';
@@ -39,7 +41,8 @@ export async function startPreview(projectId: string, projectPath: string, avoid
     return state;
   }
 
-  const child = spawnBin('npm', ['run', 'dev', '--', '-p', String(port)], {
+  const { script, args } = devCommand(projectPath, port);
+  const child = spawnBin('npm', ['run', script, '--', ...args], {
     cwd: projectPath, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, ...portEnv(port), BROWSER: 'none', FORCE_COLOR: '0', NEXT_TELEMETRY_DISABLED: '1' },
   });
@@ -164,4 +167,38 @@ function explain(log: string, code: number | null): string {
   const prev = lines.at(-2);
   const wrapped = prev && /[,;]$/.test(prev) ? `${prev} ${last}` : last;
   return wrapped.slice(0, 220);
+}
+
+
+/**
+ * How to start *this* project's dev server on a given port.
+ *
+ * Generated sites are always Next, where the flag is `-p`. A revamped site is
+ * whatever somebody already had, and the flag is different in every framework:
+ * Vite and Astro want `--port`, Next wants `-p`, and passing the wrong one
+ * makes the server exit with a usage message that reads like our bug. PORT is
+ * set in the environment as well, which several of them honour on their own and
+ * none of them mind.
+ *
+ * `start` is the fallback because Create React App and a few older setups have
+ * no `dev` script at all.
+ */
+function devCommand(projectPath: string, port: number): { script: string; args: string[] } {
+  let pkg: { scripts?: Record<string, string>; dependencies?: Record<string, string>; devDependencies?: Record<string, string> } = {};
+  try { pkg = JSON.parse(readFileSync(join(projectPath, 'package.json'), 'utf8')); } catch { /* no package.json: npm will say so */ }
+
+  const scripts = pkg.scripts ?? {};
+  const script = scripts.dev ? 'dev' : scripts.start ? 'start' : 'dev';
+  const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+  const command = scripts[script] ?? '';
+
+  // Read the script itself first: it says what is actually being run, which
+  // beats guessing from the dependency list when a project has several.
+  if (/\bnext\b/.test(command) || 'next' in deps) return { script, args: ['-p', String(port)] };
+  if (/\b(vite|astro)\b/.test(command) || 'vite' in deps || 'astro' in deps) return { script, args: ['--port', String(port), '--strictPort'] };
+  if (/\bnuxt\b/.test(command) || 'nuxt' in deps) return { script, args: ['--port', String(port)] };
+
+  // Anything else: PORT in the environment is the only portable lever, and
+  // adding a flag it does not understand would stop it starting at all.
+  return { script, args: [] };
 }

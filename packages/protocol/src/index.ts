@@ -225,6 +225,16 @@ export interface BusinessDetails {
 /** Everything the person chose. The whole input to the compiler. */
 export interface Spec {
   kind: 'website';
+  /**
+   * Where the words come from.
+   *
+   * `new` scaffolds the template into an empty folder and invents everything.
+   * `revamp` is pointed at a website that already exists: the routes, the copy
+   * and the data are already there and stay there, and only the design is
+   * replaced. Everything between those two ends — the questions, the
+   * directions, the tune panel, the chat — is the same, which is the point.
+   */
+  mode?: 'new' | 'revamp';
   name: string;
   folder: string;
 
@@ -394,6 +404,8 @@ export interface Project {
   name: string;
   slug: string;
   path: string;
+  /** A site that existed before Super Builds saw it. */
+  mode?: 'new' | 'revamp';
   createdAt: number;
   updatedAt: number;
   status: ProjectStatus;
@@ -539,6 +551,65 @@ export interface AdminLogin {
   password?: string;
   configured: boolean;
   path: string;
+}
+
+/* ---------------------------------------------------------------------------
+   Revamping a site that already exists
+--------------------------------------------------------------------------- */
+
+export type Framework = 'next' | 'vite' | 'cra' | 'astro' | 'remix' | 'sveltekit' | 'nuxt' | 'static' | 'unknown';
+
+/** What can be known about somebody's existing website without asking a model. */
+export interface SiteSurvey {
+  path: string;
+  ok: boolean;
+  reason?: string;
+  framework: Framework;
+  frameworkLabel: string;
+  /** Whether the pre-built scene components can be dropped in as they are. */
+  react: boolean;
+  packageName?: string;
+  devScript?: string;
+  buildScript?: string;
+  typescript: boolean;
+  tailwind: boolean;
+  /** Public routes, as a visitor sees them. */
+  routes: string[];
+  /**
+   * Routes behind a login — an admin, a dashboard, an account area.
+   *
+   * Kept apart from the public ones because they are a different job. A
+   * marketing page wants a redesign; a table of somebody's customers wants the
+   * new colours and its layout left alone, and conflating the two is how a
+   * revamp turns a working CRM into a hero section.
+   */
+  privateRoutes: string[];
+  routeFiles: string[];
+  images: number;
+  fileCount: number;
+  git: { repo: boolean; clean: boolean; branch?: string; dirty: number };
+  /** The site's own words, for the model to read. Not shown in full. */
+  content: string;
+  /** Things to say before anything is changed. */
+  notes: string[];
+}
+
+/** What a model made of it: the business, and the answers it would have given. */
+export interface Understanding {
+  name: string;
+  summary: string;
+  archetype: string;
+  goal: string;
+  belief?: string;
+  pages?: string[];
+  features?: string[];
+  details?: BusinessDetails;
+  /** What the current site gets right and must not lose. */
+  keep: string[];
+  /** What is holding it back. */
+  problems: string[];
+  suggests?: DnaSuggestion;
+  customPalette?: CustomPalette;
 }
 
 /* ---------------------------------------------------------------------------

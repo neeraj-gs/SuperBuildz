@@ -6,6 +6,7 @@ import { Setup } from '@/features/setup/Setup';
 import { Dashboard } from '@/features/dashboard/Dashboard';
 import { Wizard } from '@/features/wizard/Wizard';
 import { Workspace } from '@/features/workspace/Workspace';
+import { Revamp } from '@/features/revamp/Revamp';
 
 /**
  * One shell, one header. The header is defined here and nowhere else — an
@@ -40,6 +41,7 @@ export function App() {
         {route.name === 'setup' && <Setup />}
         {route.name === 'projects' && <Dashboard />}
         {route.name === 'new' && <Wizard />}
+        {route.name === 'revamp' && <Revamp />}
       </main>
       <Toasts />
     </div>
@@ -70,6 +72,7 @@ function TopBar({ overlay }: { overlay: boolean }) {
             <span className="hidden sm:inline">Requirements</span>
           </NavLink>
           <NavLink on={route.name === 'projects'} onClick={() => navigate({ name: 'projects' })}>Projects</NavLink>
+          <Button size="sm" icon="refresh" onClick={() => navigate({ name: 'revamp' })} title="Redesign a site you already have">Revamp</Button>
           <Button variant="primary" size="sm" icon="plus" className="ml-1.5" onClick={() => navigate({ name: 'new' })}>New site</Button>
           {!connected && <span className="telemetry text-danger ml-2 hidden md:inline">daemon offline</span>}
         </nav>

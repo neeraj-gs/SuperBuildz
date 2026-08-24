@@ -15,12 +15,14 @@ export type Route =
   | { name: 'setup' }
   | { name: 'projects' }
   | { name: 'new'; from?: string }
+  | { name: 'revamp' }
   | { name: 'project'; id: string };
 
 function parseRoute(path: string): Route {
   if (path === '/setup') return { name: 'setup' };
   if (path === '/projects') return { name: 'projects' };
   if (path === '/new') return { name: 'new' };
+  if (path === '/revamp') return { name: 'revamp' };
   const m = path.match(/^\/p\/([^/]+)/);
   if (m) return { name: 'project', id: m[1] };
   return { name: 'landing' };
@@ -30,6 +32,7 @@ export function pathFor(r: Route): string {
     case 'setup': return '/setup';
     case 'projects': return '/projects';
     case 'new': return '/new';
+    case 'revamp': return '/revamp';
     case 'project': return `/p/${r.id}`;
     default: return '/';
   }

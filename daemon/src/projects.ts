@@ -40,10 +40,11 @@ export function createProject(spec: Spec): Project {
   const id = projectHash(path);
   const existing = getProject(id);
   const now = Date.now();
+  const mode = spec.mode ?? 'new';
   const project: Project = existing
-    ? { ...existing, name: spec.name || existing.name, spec: { ...spec, folder: path }, updatedAt: now }
+    ? { ...existing, name: spec.name || existing.name, mode, spec: { ...spec, folder: path }, updatedAt: now }
     : {
-      id, name: spec.name || 'Untitled', slug: slugify(spec.name), path, createdAt: now, updatedAt: now,
+      id, name: spec.name || 'Untitled', slug: slugify(spec.name), path, mode, createdAt: now, updatedAt: now,
       status: 'draft', spec: { ...spec, folder: path },
     };
   const saved = saveProject(project);

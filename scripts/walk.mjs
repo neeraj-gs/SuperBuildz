@@ -120,6 +120,32 @@ if (await press('Restaurant', 'archetype')) {
   }
 }
 
+/*
+  The revamp screen.
+
+  Reading a site costs a real Claude turn, so it runs only with --revamp and
+  takes a path to point at. Everything before the reading is free and is always
+  checked: a folder that is not a website has to be refused, and a folder that
+  is one has to come back with its routes.
+*/
+
+if (process.env.SB_REVAMP_PATH) {
+  await page.goto(`${base}/revamp`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1200);
+  await shot('revamp-empty', 'the revamp screen');
+
+  await page.locator('input').first().fill(process.env.SB_REVAMP_PATH);
+  if (await press('Look at it', 'survey')) {
+    await page.waitForTimeout(3000);
+    await shot('revamp-survey', 'what the survey found');
+
+    // The reading is a bounded Claude turn; give it up to four minutes.
+    const understood = page.getByText('What it gets right', { exact: false }).first();
+    try { await understood.waitFor({ timeout: 240_000 }); await shot('revamp-understood', 'what it made of the site'); }
+    catch { console.log('  the reading did not finish inside four minutes'); failures++; }
+  }
+}
+
 await browser.close();
 console.log(failures ? `\n${failures} problem(s). Look at shots/panel-*.png.` : '\nAll panels rendered clean. shots/panel-*.png');
 process.exit(failures ? 1 : 0);

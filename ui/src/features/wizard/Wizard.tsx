@@ -118,10 +118,12 @@ export function Wizard() {
   }, [step.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!spec.folder) { setFolderNote(''); return; }
+    // A revamp is pointed at a folder that already has a website in it, so the
+    // empty-folder check would be exactly backwards.
+    if (!spec.folder || spec.mode === 'revamp') { setFolderNote(''); return; }
     const t = setTimeout(() => { api.checkFolder(spec.folder).then((r) => setFolderNote(r.ok ? '' : r.reason ?? '')).catch(() => {}); }, 400);
     return () => clearTimeout(t);
-  }, [spec.folder]);
+  }, [spec.folder, spec.mode]);
 
   const suggestNames = async () => {
     setNamesBusy(true);
@@ -230,7 +232,19 @@ export function Wizard() {
 
       <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(380px,44%)] gap-10 items-start">
         <div className="min-w-0">
-          <Index n={at + 1} className="mb-4">{step.id === 'go' ? 'Ready to build' : step.id}</Index>
+          {spec.mode === 'revamp' && (
+            <div className="panel p-3.5 mb-6 flex items-start gap-3 border-volt-3 bg-volt-2">
+              <Icon name="refresh" size={16} className="text-volt mt-0.5 shrink-0" />
+              <div className="text-[13px]">
+                <span className="font-semibold">Revamping a site you already have.</span>{' '}
+                <span className="text-bone-2">
+                  Every answer below is filled in from what it is now. Your pages, your words and
+                  your data stay exactly where they are \u2014 only the design changes.
+                </span>
+              </div>
+            </div>
+          )}
+          <Index n={at + 1} className="mb-4">{step.id === 'go' ? (spec.mode === 'revamp' ? 'Ready to revamp' : 'Ready to build') : step.id}</Index>
           <h1 className="d3">{step.title}</h1>
           <p className="copy mt-3 mb-8">{step.lede}</p>
 
@@ -518,21 +532,27 @@ function GoStep({ spec, plan, showBrief, setShowBrief, setSpec, folderNote, ques
   questions: Question[] | null; qBusy: boolean; askQuestions: () => void; answers: Record<string, string[]>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string[]>>>; build: () => void; building: boolean;
 }) {
   const detection = useStore((s) => s.detection);
+  const revamping = spec.mode === 'revamp';
   const notes = useMemo(() => Object.entries(spec.stepNotes ?? {}).filter(([, v]) => v.trim()), [spec.stepNotes]);
   return (
     <div className="space-y-6">
       <div className="grid sm:grid-cols-2 gap-4">
         <Labelled label="Name"><Input value={spec.name} onChange={(e) => setSpec((s) => ({ ...s, name: e.target.value }))} placeholder="Required" /></Labelled>
-        <Labelled label="Folder"><Input value={spec.folder} onChange={(e) => setSpec((s) => ({ ...s, folder: e.target.value }))} /></Labelled>
+        <Labelled label={revamping ? 'Folder \u2014 the site you already have' : 'Folder'}>
+          <Input value={spec.folder} readOnly={revamping} onChange={(e) => setSpec((s) => ({ ...s, folder: e.target.value }))} />
+        </Labelled>
       </div>
-      {folderNote && <p className="text-[13px] text-danger -mt-3">{folderNote}</p>}
+      {!revamping && folderNote && <p className="text-[13px] text-danger -mt-3">{folderNote}</p>}
 
       {!plan ? <div className="panel p-6 flex items-center gap-3 text-bone-2"><Spinner /> Compiling the brief…</div> : (
         <>
           <div className="panel p-5">
             <div className="flex items-center justify-between mb-3"><span className="legend">Stages</span><span className="telemetry text-bone-3">{plan.estimate.minutes[0]}–{plan.estimate.minutes[1]} min · roughly ${plan.estimate.lowUsd}–{plan.estimate.highUsd} of usage</span></div>
             <ol className="grid sm:grid-cols-2 gap-2">
-              {[{ id: 'scaffold', label: 'Template and dependencies', blurb: 'Copy the starter, write your tokens, install' }, ...plan.stages].map((s, i) => (
+              {[revamping
+                ? { id: 'prepare', label: 'A branch, and a way back', blurb: 'Commit what is there, then work on superbuilds/revamp' }
+                : { id: 'scaffold', label: 'Template and dependencies', blurb: 'Copy the starter, write your tokens, install' },
+                ...plan.stages].map((s, i) => (
                 <li key={s.id} className="flex gap-3 rounded-lg bg-ink-3 border border-line p-3"><span className="telemetry text-volt w-5">{i}</span><div><div className="font-semibold text-[13.5px]">{s.label}</div><div className="text-[12.5px] text-bone-3 leading-snug mt-0.5">{s.blurb}</div></div></li>
               ))}
             </ol>
@@ -605,8 +625,14 @@ function GoStep({ spec, plan, showBrief, setShowBrief, setSpec, folderNote, ques
           {detection && !detection.ok && <div className="panel p-4 border-danger/40 flex items-center justify-between gap-3"><span className="text-[13.5px]">Something is missing on this machine.</span><Button size="sm" onClick={() => navigate({ name: 'setup' })}>Check requirements</Button></div>}
 
           <div className="flex items-center gap-3 pt-2">
-            <Button variant="primary" size="lg" icon="rocket" busy={building} onClick={build} disabled={!spec.name.trim() || !!folderNote}>Build it</Button>
-            <span className="text-[13px] text-bone-3">Creates the folder, installs, then builds in stages while you watch. You can stop at any time.</span>
+            <Button variant="primary" size="lg" icon="rocket" busy={building} onClick={build} disabled={!spec.name.trim() || (!revamping && !!folderNote)}>
+              {revamping ? 'Revamp it' : 'Build it'}
+            </Button>
+            <span className="text-[13px] text-bone-3">
+              {revamping
+                ? 'Commits what is there, moves to a branch of its own, then redesigns in stages while you watch. Your branch is left exactly as it is.'
+                : 'Creates the folder, installs, then builds in stages while you watch. You can stop at any time.'}
+            </span>
           </div>
         </>
       )}
