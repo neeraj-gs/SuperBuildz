@@ -310,6 +310,39 @@ Two things make it usable by somebody who does not want to type:
 Every turn takes a checkpoint first and commits after, so "undo that" is a
 button.
 
+## 6a. Several conversations at once
+
+A build is not one task. Somebody wants the menu page rewritten, the colours
+tried three ways and the booking form fixed, and running all three through one
+conversation means each waits for the last and the transcript becomes a place
+nobody can find anything. So a project has as many conversations as it needs,
+as tabs.
+
+**`daemon/src/capacity.ts`** — ported in shape from PowerHouse, which learned it
+the hard way. Nothing limited anything across conversations, so four open ones
+plus a build launched five Claude Code processes, each a Node runtime plus a
+model client plus whatever it spawns. On a laptop that is not parallelism, it is
+swapping, and the symptom looks like the model being slow. The ceiling is
+derived from the machine (half the cores, clamped to 2–6) rather than picked,
+and a turn over it **waits and then runs**: refusing it pushes the problem back
+to the person, and "try again in a minute" is a worse answer than "it is second
+in line". The queue is shown in the tab bar, never hidden.
+
+**`daemon/src/memory.ts`** — the other half, and the one parallelism creates.
+The moment a project has two conversations they stop being one assistant and
+become several with amnesia: one rewriting a page another has just been told is
+fine. The cheap answer that works is a shared notebook,
+`.superbuilds/memory.md`, in two halves. The top is the person's, typed once and
+read into every conversation's system prompt — what the business is really like,
+words never to use, a decision they do not want revisited. The bottom is a log
+the daemon writes: one line per finished turn, which conversation, what it did,
+capped at twenty. Every prompt also carries a line about what the *other*
+conversations are doing right now, taken from the message each was last sent.
+
+The daemon writes the log rather than asking the model to, because a model asked
+to maintain a shared file will do it beautifully for three turns and then stop,
+and nothing will notice.
+
 ## 7. Storage decisions
 
 | What | Where | Why |

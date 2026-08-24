@@ -6,7 +6,7 @@
 
 import { create } from 'zustand';
 import type {
-  Detection, Project, Session, GenerationState, PreviewState, DeployState, ReferenceCapture, ServerEvent, Catalogue, Turn, ToolCall, TweakState, AnalyticsState,
+  Detection, Project, Session, GenerationState, PreviewState, DeployState, ReferenceCapture, ServerEvent, Catalogue, Turn, ToolCall, TweakState, AnalyticsState, Capacity,
 } from '@superbuilds/protocol';
 import { api, setToken } from './api';
 
@@ -57,6 +57,7 @@ interface State {
   captures: Record<string, ReferenceCapture>;
   tweaks: Record<string, TweakState>;
   analytics: Record<string, AnalyticsState>;
+  capacity?: Capacity;
   toasts: Toast[];
   navigate: (r: Route) => void;
   toast: (text: string, kind?: Toast['kind']) => void;
@@ -139,6 +140,8 @@ export const useStore = create<State>((set, get) => ({
       case 'reference.update': set((s) => ({ captures: { ...s.captures, [ev.capture.id]: ev.capture } })); break;
       case 'tweaks.update': set((s) => ({ tweaks: { ...s.tweaks, [ev.state.projectId]: ev.state } })); break;
       case 'analytics.update': set((s) => ({ analytics: { ...s.analytics, [ev.state.projectId]: ev.state } })); break;
+      case 'capacity.update': set({ capacity: ev.capacity }); break;
+      case 'session.remove': set((s) => { const sessions = { ...s.sessions }; delete sessions[ev.sessionId]; return { sessions }; }); break;
       default: break;
     }
   },

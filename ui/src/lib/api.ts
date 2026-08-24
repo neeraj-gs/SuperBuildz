@@ -5,7 +5,7 @@
 
 import type {
   Catalogue, Detection, InstallRecipeView, Plan, Project, Session, Spec, GenerationState, PreviewState, DeployState,
-  ReferenceCapture, Choice, TweakState, Tweaks, Direction, FileEntry, FileBody, AdminLogin, AnalyticsState, EngineInfo, SiteSurvey, Understanding,
+  ReferenceCapture, Choice, TweakState, Tweaks, Direction, FileEntry, FileBody, AdminLogin, AnalyticsState, EngineInfo, SiteSurvey, Understanding, Capacity, ProjectMemory,
 } from '@superbuilds/protocol';
 
 let token = '';
@@ -77,6 +77,15 @@ export const api = {
   generation: (id: string) => get<GenerationState | null>(`/api/projects/${id}/generation`),
 
   projectSession: (id: string) => get<Session>(`/api/projects/${id}/session`),
+
+  /* Several conversations at once, and the notebook they share */
+  capacity: () => get<Capacity>('/api/capacity'),
+  sessions: (id: string) => get<Session[]>(`/api/projects/${id}/sessions`),
+  newSession: (id: string, title?: string) => post<Session>(`/api/projects/${id}/sessions`, { title }),
+  renameSession: (sid: string, title: string) => patch<Session>(`/api/sessions/${sid}`, { title }),
+  deleteSession: (sid: string) => del<{ ok: boolean }>(`/api/sessions/${sid}`),
+  memory: (id: string) => get<ProjectMemory>(`/api/projects/${id}/memory`),
+  setMemory: (id: string, text: string) => post<ProjectMemory>(`/api/projects/${id}/memory`, { text }),
   session: (id: string) => get<Session>(`/api/sessions/${id}`),
   turn: (sid: string, text: string, model?: string) => post<{ ok: boolean }>(`/api/sessions/${sid}/turn`, { text, model }),
   change: (sid: string, kind: string, targets: string[], notes?: string) => post<{ ok: boolean }>(`/api/sessions/${sid}/change`, { kind, targets, notes }),

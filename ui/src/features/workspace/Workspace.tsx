@@ -35,6 +35,7 @@ import { Files } from './Files';
 import { AdminBar } from './AdminBar';
 import { AnalyticsPanel } from './AnalyticsPanel';
 import { EnginePanel } from './EnginePanel';
+import { NotesPanel, SessionTabs } from './Sessions';
 
 /** The screens worth checking, and the width each one really is. */
 const DEVICES = [
@@ -67,6 +68,7 @@ export function Workspace({ id }: { id: string }) {
   const [analytics, setAnalytics] = useState(false);
   const [engine, setEngine] = useState(false);
   const [openFile, setOpenFile] = useState<string | undefined>();
+  const [notes, setNotes] = useState(false);
 
   const [reload, setReload] = useState(0);
   const [starting, setStarting] = useState(false);
@@ -83,7 +85,11 @@ export function Workspace({ id }: { id: string }) {
     api.projectSession(id).then((s) => { setSessionId(s.id); useStore.getState().apply({ type: 'session.upsert', session: s }); }).catch((e) => toast(e.message, 'error'));
   }, [project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { if (project?.sessionId && project.sessionId !== sessionId) { setSessionId(project.sessionId); void useStore.getState().loadSession(project.sessionId); } }, [project?.sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (project?.sessionId && !sessionId) { setSessionId(project.sessionId); } }, [project?.sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Only the conversation in front of you is fetched in full; the tabs carry
+  // the rest as summaries until one is picked.
+  useEffect(() => { if (sessionId && !sessions[sessionId]?.turns) void useStore.getState().loadSession(sessionId).catch(() => {}); }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Escape leaves full screen, because a screen with no visible way out is a trap.
   useEffect(() => {
@@ -148,6 +154,7 @@ export function Workspace({ id }: { id: string }) {
                 <Button variant="primary" icon="rocket" className="mt-3" onClick={build}>Build it</Button>
               </div>
             )}
+            <SessionTabs projectId={id} activeId={sessionId} onPick={setSessionId} onNotes={() => setNotes(true)} />
             {generation && <Stages state={generation} projectId={id} />}
             {session ? <Chat session={session} projectId={id} busy={!!generation?.running} /> : <div className="flex-1 grid place-items-center text-bone-3"><Spinner /></div>}
           </aside>
@@ -178,6 +185,7 @@ export function Workspace({ id }: { id: string }) {
                     { group: 'This project' },
                     { label: 'Analytics and where to read it', icon: 'chart', onClick: () => setAnalytics(true) },
                     { label: 'Under the hood — the prompt and the rules', icon: 'cube', onClick: () => setEngine(true) },
+                    { label: 'Shared notes every conversation reads', icon: 'book', onClick: () => setNotes(true) },
                     { label: 'Edit .env.local', icon: 'key', onClick: () => { setOpenFile('.env.local'); setView('files'); } },
                     { label: 'Rename', icon: 'edit', onClick: rename },
 
@@ -261,6 +269,7 @@ export function Workspace({ id }: { id: string }) {
       {showDeploy && <DeployPanel projectId={id} onClose={() => setShowDeploy(false)} />}
       {analytics && <AnalyticsPanel projectId={id} onClose={() => setAnalytics(false)} />}
       {engine && <EnginePanel projectId={id} onClose={() => setEngine(false)} />}
+      {notes && <NotesPanel projectId={id} onClose={() => setNotes(false)} />}
     </div>
   );
 }

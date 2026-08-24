@@ -23,7 +23,7 @@ import { planFor, questionsPrompt, QUESTIONS_SCHEMA, namesPrompt, NAMES_SCHEMA, 
 import { askOnce, listModels } from './claude.ts';
 import { createProject, deleteProject, folderFor, folderIsUsable, getProject, listProjects, updateProject } from './projects.ts';
 import { getSession, listSessions, capturesDir, thumbsDir } from './store.ts';
-import { createSession, sendTurn, stopTurn, rewindTo, closeAll, configureHooks, sessionIsBusy } from './sessions.ts';
+import { createSession, sendTurn, stopTurn, rewindTo, closeAll, configureHooks, sessionIsBusy, renameSession, deleteSession } from './sessions.ts';
 import { runGeneration, cancelGeneration, generationState } from './generate.ts';
 import { previewState, startPreview, stopPreview, stopAllPreviews } from './preview.ts';
 import { startCapture, getCapture, captureAvailable, thumbnailFor } from './reference.ts';
@@ -36,6 +36,8 @@ import { listDir, readProjectFile, writeProjectFile, createProjectFile, deletePr
 import { adminLogin, setAdminPassword, setAdminEmail, forgetDevPassword } from './admin.ts';
 import { analyticsState, setAnalytics, setAnalyticsKeys } from './analytics.ts';
 import { engineInfo, setBrief } from './engine.ts';
+import { ceiling, queued, onQueueChange } from './capacity.ts';
+import { memory, setMemory } from './memory.ts';
 import { surveySite } from './survey.ts';
 import { understandPrompt, UNDERSTAND_SCHEMA, revampPlan } from './revamp.ts';
 import { execPlain } from './binaries.ts';
@@ -496,6 +498,57 @@ app.post('/api/projects/:id/brief', async (req, reply) => {
   catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
 });
 
+/* Several conversations at once, and the notebook they share */
+
+/** Turns in flight, what this machine will carry, and what is in line. */
+function capacityNow() {
+  return { running: listProjects().reduce((n, p) => n + listSessions(p.id).filter((s) => sessionIsBusy(s.id)).length, 0), ceiling: ceiling(), waiting: queued() };
+}
+app.get('/api/capacity', async () => capacityNow());
+
+app.get('/api/projects/:id/sessions', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  // Newest last, so the tabs read left to right in the order they were opened.
+  return listSessions(p.id).sort((a, b) => a.createdAt - b.createdAt);
+});
+app.post('/api/projects/:id/sessions', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  const { title } = (req.body ?? {}) as { title?: string };
+  const n = listSessions(p.id).length + 1;
+  return createSession(p.id, String(title ?? '').trim().slice(0, 60) || `Conversation ${n}`);
+});
+app.patch('/api/sessions/:id', async (req, reply) => {
+  const s = getSession((req.params as { id: string }).id); if (!s) return reply.code(404).send({ error: 'no such conversation' });
+  const { title } = (req.body ?? {}) as { title?: string };
+  const named = String(title ?? '').trim().slice(0, 60);
+  if (!named) return reply.code(400).send({ error: 'Give it a name.' });
+  return renameSession(s.id, named);
+});
+app.delete('/api/sessions/:id', async (req, reply) => {
+  const s = getSession((req.params as { id: string }).id); if (!s) return reply.code(404).send({ error: 'no such conversation' });
+  if (sessionIsBusy(s.id)) return reply.code(409).send({ error: 'Claude is still replying in that one. Stop it first.' });
+  const p = getProject(s.projectId);
+  // The project always keeps one conversation: closing the last would leave it
+  // with nothing to talk to.
+  if (p && listSessions(p.id).length <= 1) return reply.code(400).send({ error: 'That is the only conversation about this project.' });
+  deleteSession(s.id);
+  if (p?.sessionId === s.id) updateProject(p.id, { sessionId: listSessions(p.id)[0]?.id });
+  return { ok: true };
+});
+
+app.get('/api/projects/:id/memory', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  return { projectId: p.id, ...memory(p.path) };
+});
+app.post('/api/projects/:id/memory', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  try {
+    const m = { projectId: p.id, ...setMemory(p.path, String((req.body as { text?: string })?.text ?? '')) };
+    broadcast({ type: 'memory.update', memory: m });
+    return m;
+  } catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+
 /* Hooks from Claude Code */
 
 app.post('/hooks/pretooluse', async (req, reply) => {
@@ -516,6 +569,9 @@ app.post('/hooks/notification', async (req, reply) => { if (req.headers['x-super
 
 await app.listen({ port: PORT, host: HOST });
 configureHooks(PORT, TOKEN);
+// Anything joining or leaving the queue is news: it is the only explanation a
+// person has for a conversation that has not started yet.
+onQueueChange(() => broadcast({ type: 'capacity.update', capacity: capacityNow() }));
 
 const wss = new WebSocketServer({ server: app.server, path: '/ws' });
 wss.on('connection', (ws, req) => {
@@ -525,6 +581,7 @@ wss.on('connection', (ws, req) => {
   send(ws, { type: 'hello', token: TOKEN });
   for (const p of listProjects()) send(ws, { type: 'project.upsert', project: p });
   for (const p of listProjects()) { const g = generationState(p.id); if (g) send(ws, { type: 'generation.update', state: g }); const pv = previewState(p.id); if (pv.running) send(ws, { type: 'preview.update', state: pv }); }
+  send(ws, { type: 'capacity.update', capacity: capacityNow() });
   ws.on('close', () => removeClient(ws));
   ws.on('error', () => removeClient(ws));
 });

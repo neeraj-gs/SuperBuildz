@@ -16,11 +16,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { splitOptions, type Session, type ToolCall, type Turn } from '@superbuilds/protocol';
 import { startSession, resultError, writeHookSettings, type SessionHandle } from './claude.ts';
-import { checkpointsDir, getSession, saveSession } from './store.ts';
+import { checkpointsDir, getSession, saveSession, removeSession } from './store.ts';
 import { takeSnapshot, restoreSnapshot, pruneSnapshots } from './checkpoints.ts';
 import { broadcast } from './bus.ts';
 import { execPlain } from './binaries.ts';
 import { systemPromptFor } from './brief.ts';
+import { admitOrQueue, configureCapacity, drain, unqueue } from './capacity.ts';
+import { memoryPrompt, noteTurn } from './memory.ts';
+import { listSessions } from './store.ts';
 
 interface Live {
   handle: SessionHandle;
@@ -40,6 +43,16 @@ interface Live {
 }
 
 const live = new Map<string, Live>();
+
+/*
+  How many conversations are mid-turn right now, across every project.
+
+  This is the number the ceiling is compared against, and it counts turns rather
+  than processes on purpose: a session with its process warm but nothing to say
+  costs almost nothing, and refusing to start a new one because four idle ones
+  exist would be the wrong kind of careful.
+*/
+configureCapacity({ countLive: () => [...live.values()].filter((l) => l.turn).length });
 let hookPort = 0;
 let hookToken = '';
 
@@ -52,6 +65,33 @@ export function createSession(projectId: string, title: string): Session {
   saveSession(s);
   broadcast({ type: 'session.upsert', session: s });
   return s;
+}
+
+/** Rename a conversation. The name is what the other conversations see it as. */
+export function renameSession(id: string, title: string): Session | undefined {
+  const s = getSession(id);
+  if (!s) return undefined;
+  return save({ ...s, title, updatedAt: Date.now() });
+}
+
+/**
+ * Delete a conversation.
+ *
+ * The transcript goes and the process with it; the project, its files and its
+ * git history are untouched. There is no undo because there is nothing to undo
+ * — everything a conversation did was committed as it went, and the shared
+ * notes keep the line it wrote.
+ *
+ * Distinct from `closeSession`, which ends the process and keeps the transcript
+ * and is what shutdown calls.
+ */
+export function deleteSession(id: string): void {
+  closeSession(id);
+  unqueue(id);
+  removeSession(id);
+  broadcast({ type: 'session.remove', sessionId: id });
+  // A slot may have just come free.
+  drain();
 }
 
 export function sessionIsBusy(id: string): boolean {
@@ -73,7 +113,14 @@ function ensureProcess(session: Session, projectPath: string, projectName: strin
     cwd: projectPath,
     sessionId: session.id,
     resumeSessionId: session.claudeSessionId,
-    systemPrompt: systemPromptFor(projectName, { stage: opts.stage }),
+    systemPrompt: [
+      systemPromptFor(projectName, { stage: opts.stage }),
+      // What the other conversations about this project know and are doing.
+      // Composed per process rather than per turn because the system prompt is
+      // fixed for the life of the process; the log inside it is refreshed
+      // whenever a process is restarted, which a long session does often.
+      memoryPrompt(projectPath, othersOn(session)),
+    ].filter(Boolean).join('\n\n'),
     model: opts.model,
     maxBudgetUsd: opts.budgetUsd,
     permissionMode: 'bypassPermissions',
@@ -176,6 +223,11 @@ async function finishTurn(sessionId: string, rec: Record<string, unknown>) {
   broadcast({ type: 'session.turn', sessionId, turn });
 
   await commitAll(l.projectPath, `Super Builds: ${stageOf ? `stage ${stageOf}` : 'change'} — ${(s.turns.findLast((x) => x.role === 'user')?.text ?? '').split('\n')[0].slice(0, 80)}`);
+
+  // One line in the project's shared notes, so every other conversation about
+  // it knows what just happened without anybody having to paste anything.
+  if (!error && turn.text) noteTurn(l.projectPath, s.title, turn.text);
+
   if (error) t.reject(new Error(error)); else t.resolve(turn);
 }
 
@@ -199,18 +251,64 @@ export async function sendTurn(sessionId: string, text: string, projectPath: str
   save({ ...s, status: 'running', turns: [...s.turns, userTurn, assistantTurn] });
   broadcast({ type: 'session.turn', sessionId, turn: userTurn });
 
-  const l = ensureProcess(s, projectPath, projectName, { model: opts.model, budgetUsd: opts.budgetUsd, stage: opts.stage });
-  const note = l.note; l.note = undefined;
+  /*
+    Over the ceiling, this waits its turn rather than being refused.
 
+    The whole promise is handed to the queue, so the caller — a chat message or
+    a build stage — simply takes longer to resolve and never has to know. The
+    conversation shows "second in line" in the meantime, which is the honest
+    thing to say and better than a spinner that means nothing.
+  */
   return new Promise<Turn>((resolve, reject) => {
-    l.turn = { id: assistantTurn.id, text: '', blocks: [], tools: new Map(), startedAt: Date.now(), resolve, reject };
-    l.handle.send(note ? `${note}\n\n${text}` : text);
+    const start = () => new Promise<void>((settle) => {
+      const l = ensureProcess(s, projectPath, projectName, { model: opts.model, budgetUsd: opts.budgetUsd, stage: opts.stage });
+      const note = l.note; l.note = undefined;
+      l.turn = {
+        id: assistantTurn.id, text: '', blocks: [], tools: new Map(), startedAt: Date.now(),
+        // Settling the outer promise and releasing the queue slot are the same
+        // moment; separating them is how a slot leaks.
+        resolve: (t) => { resolve(t); settle(); },
+        reject: (e) => { reject(e); settle(); },
+      };
+      l.handle.send(note ? `${note}\n\n${text}` : text);
+    });
+
+    const { started, position } = admitOrQueue({ sessionId, projectId: s.projectId, title: s.title, start });
+    if (!started) {
+      save({ ...getSession(sessionId)!, status: 'running' });
+      broadcast({
+        type: 'session.turn',
+        sessionId,
+        turn: { id: `queued-${assistantTurn.id}`, role: 'system', at: Date.now(),
+          text: `Waiting: this machine is running as many conversations at once as it comfortably can. This one is number ${position} in line and starts on its own.` },
+      });
+    }
   });
+}
+
+/**
+ * The other conversations about the same project that are mid-turn.
+ *
+ * What each is "doing" is the first line of the message it was last sent — the
+ * person's own words for the task, which is a better description of the work
+ * than anything that could be inferred from it.
+ */
+function othersOn(session: Session): Array<{ title: string; doing: string }> {
+  return listSessions(session.projectId)
+    .filter((o) => o.id !== session.id && live.get(o.id)?.turn)
+    .map((o) => {
+      const lastUser = [...o.turns].reverse().find((t) => t.role === 'user');
+      const doing = (lastUser?.text ?? '').split('\n')[0].trim().slice(0, 140);
+      return { title: o.title, doing: doing || 'working on this project' };
+    })
+    .slice(0, 4);
 }
 
 export async function stopTurn(sessionId: string): Promise<'stopped' | 'killed' | 'idle'> {
   const l = live.get(sessionId);
-  if (!l?.turn) return 'idle';
+  // Stopping something that has not started yet takes it out of the line, which
+  // is the only way a queued turn can be cancelled.
+  if (!l?.turn) return unqueue(sessionId) ? 'stopped' : 'idle';
   const how = await l.handle.interrupt();
   // The interrupt produces a result record; if it does not, close out here.
   setTimeout(() => {

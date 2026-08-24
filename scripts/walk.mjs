@@ -90,6 +90,30 @@ if (await gear.count()) {
   }
 } else { console.log('  MISSING: the options menu'); failures++; }
 
+/* Several conversations about one project. */
+
+await page.goto(`${base}/p/${id}`, { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(2200);
+
+// A second conversation appears as a tab; closing it puts things back.
+const addTab = page.locator('button[title="Another conversation about this project"]').first();
+if (await addTab.count()) {
+  await addTab.click();
+  await page.waitForTimeout(1400);
+  await shot('sessions-two', 'two conversations, side by side');
+  if (await press('Notes', 'shared notes')) await shot('sessions-notes', 'the notebook every conversation reads');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
+
+  // Leave the project as it was found.
+  page.once('dialog', (d) => d.accept());
+  const close = page.locator('button', { hasText: 'Conversation 2' }).first();
+  if (await close.count()) {
+    await close.locator('span').last().click().catch(() => {});
+    await page.waitForTimeout(1200);
+  }
+} else { console.log('  MISSING: the new-conversation button'); failures++; }
+
 /* The wizard: the screens that used to take thirteen presses to get back to. */
 
 await page.goto(`${base}/new`, { waitUntil: 'domcontentloaded' });

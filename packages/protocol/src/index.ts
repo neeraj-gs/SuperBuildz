@@ -472,6 +472,34 @@ export interface Checkpoint {
 }
 
 /* ---------------------------------------------------------------------------
+   Several conversations at once
+--------------------------------------------------------------------------- */
+
+/**
+ * What this machine is carrying.
+ *
+ * `running` is turns in flight across every project, `ceiling` is what the
+ * machine will carry at once, and `waiting` is what is in line. A queued turn is
+ * not a failure and the interface must not draw it as one.
+ */
+export interface Capacity {
+  running: number;
+  ceiling: number;
+  waiting: Array<{ sessionId: string; projectId: string; title: string; position: number }>;
+}
+
+/** The notebook every conversation about a project reads. */
+export interface ProjectMemory {
+  projectId: string;
+  /** The whole file, for editing. */
+  text: string;
+  /** The person's standing instructions, without the log. */
+  notes: string;
+  /** One line per finished turn, newest first. */
+  entries: string[];
+}
+
+/* ---------------------------------------------------------------------------
    Generation, preview, deploy
 --------------------------------------------------------------------------- */
 
@@ -685,6 +713,7 @@ export type ServerEvent =
   | { type: 'project.upsert'; project: Project }
   | { type: 'project.remove'; projectId: string }
   | { type: 'session.upsert'; session: Session }
+  | { type: 'session.remove'; sessionId: string }
   | { type: 'session.delta'; sessionId: string; turnId: string; text: string }
   | { type: 'session.thinking'; sessionId: string; turnId: string; text: string }
   | { type: 'session.tool'; sessionId: string; turnId: string; tool: ToolCall }
@@ -695,6 +724,8 @@ export type ServerEvent =
   | { type: 'reference.update'; capture: ReferenceCapture }
   | { type: 'tweaks.update'; state: TweakState }
   | { type: 'analytics.update'; state: AnalyticsState }
+  | { type: 'capacity.update'; capacity: Capacity }
+  | { type: 'memory.update'; memory: ProjectMemory }
   | { type: 'install.update'; message: string };
 
 /* ---------------------------------------------------------------------------
