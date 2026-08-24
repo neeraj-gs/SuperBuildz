@@ -6,7 +6,7 @@
 
 import { create } from 'zustand';
 import type {
-  Detection, Project, Session, GenerationState, PreviewState, DeployState, ReferenceCapture, ServerEvent, Catalogue, Turn, ToolCall, TweakState,
+  Detection, Project, Session, GenerationState, PreviewState, DeployState, ReferenceCapture, ServerEvent, Catalogue, Turn, ToolCall, TweakState, AnalyticsState,
 } from '@superbuilds/protocol';
 import { api, setToken } from './api';
 
@@ -53,6 +53,7 @@ interface State {
   deploys: Record<string, DeployState>;
   captures: Record<string, ReferenceCapture>;
   tweaks: Record<string, TweakState>;
+  analytics: Record<string, AnalyticsState>;
   toasts: Toast[];
   navigate: (r: Route) => void;
   toast: (text: string, kind?: Toast['kind']) => void;
@@ -79,6 +80,7 @@ export const useStore = create<State>((set, get) => ({
   deploys: {},
   captures: {},
   tweaks: {},
+  analytics: {},
   toasts: [],
 
   navigate: (r) => {
@@ -133,6 +135,7 @@ export const useStore = create<State>((set, get) => ({
       case 'deploy.update': set((s) => ({ deploys: { ...s.deploys, [ev.state.projectId]: ev.state } })); break;
       case 'reference.update': set((s) => ({ captures: { ...s.captures, [ev.capture.id]: ev.capture } })); break;
       case 'tweaks.update': set((s) => ({ tweaks: { ...s.tweaks, [ev.state.projectId]: ev.state } })); break;
+      case 'analytics.update': set((s) => ({ analytics: { ...s.analytics, [ev.state.projectId]: ev.state } })); break;
       default: break;
     }
   },

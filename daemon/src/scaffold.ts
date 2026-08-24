@@ -8,7 +8,9 @@
  * that already runs.
  */
 
-import { randomBytes, scryptSync } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
+import { DEV_PASSWORD_KEY, hashPassword, makePassword } from './admin.ts';
+import { keysNeededFor } from './analytics.ts';
 import { copyMedia } from './media.ts';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -31,24 +33,6 @@ function copyTree(from: string, to: string) {
   }
 }
 
-/**
- * `scrypt:N:salt:hash`, the same shape templates/site/lib/auth.ts verifies.
- * Colons, never `$`: Next expands `$VAR` inside .env files, quoted or not,
- * and a hash full of `$` came out as `scrypt==+q08pEQ=`.
- */
-export function hashPassword(password: string): string {
-  const salt = randomBytes(16);
-  const N = 32768;
-  const hash = scryptSync(password, salt, 64, { N, r: 8, p: 1, maxmem: 128 * 1024 * 1024 });
-  return `scrypt:${N}:${salt.toString('base64')}:${hash.toString('base64')}`;
-}
-
-function makePassword(): string {
-  // Four words-ish chunks: readable over the phone, 60+ bits.
-  const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
-  const chunk = () => Array.from(randomBytes(5), (b) => alphabet[b % alphabet.length]).join('');
-  return `${chunk()}-${chunk()}-${chunk()}`;
-}
 
 /** `design.config.ts`, written from the spec so every component reads the choices. */
 export function designConfigSource(spec: Spec): string {
@@ -298,11 +282,15 @@ export async function scaffoldProject(spec: Spec, projectPath: string, onLog: (c
     `SESSION_SECRET=${randomBytes(32).toString('base64url')}`,
     `ADMIN_EMAIL=${adminEmail}`,
     `ADMIN_PASSWORD_HASH=${hashPassword(adminPassword)}`,
+    '# The same password in the clear, so Super Builds can show you the login instead of',
+    '# telling you to open this file. Stripped before anything is pushed to a host; press',
+    '# "Forget it" in the CRM panel to remove it. The hash above is what actually signs you in.',
+    `${DEV_PASSWORD_KEY}=${adminPassword}`,
     '# Leave DATABASE_URL unset to use the local SQLite file in data/. Set a Postgres URL (Neon, Supabase) before deploying.',
     '# DATABASE_URL=',
   ];
   const needs = new Set<string>();
-  for (const id of spec.analytics) { if (id === 'posthog') { needs.add('NEXT_PUBLIC_POSTHOG_KEY'); needs.add('NEXT_PUBLIC_POSTHOG_HOST'); } if (id === 'ga4') needs.add('NEXT_PUBLIC_GA_ID'); if (id === 'plausible') needs.add('NEXT_PUBLIC_PLAUSIBLE_DOMAIN'); }
+  for (const key of keysNeededFor(spec.analytics)) needs.add(key);
   if (spec.crm === 'email') { needs.add('RESEND_API_KEY'); needs.add('CONTACT_EMAIL'); }
   if (spec.features.includes('payments')) { needs.add('STRIPE_SECRET_KEY'); needs.add('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY'); }
   for (const key of needs) env.push(`# ${key}=`);

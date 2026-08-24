@@ -262,3 +262,22 @@ textarea.input { height: auto; padding: 9px 11px; line-height: 1.55; resize: ver
 /* Fades a scrolling region at its edges instead of cutting it. */
 .fade-y { mask-image: linear-gradient(to bottom, transparent, #000 16px, #000 calc(100% - 16px), transparent); }
 .fade-x { mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
+
+/* ----------------------------------------------------------- Code tokens -- */
+
+/*
+  Six colours, chosen against the ink ground and against each other rather than
+  borrowed from a theme. Comments recede furthest because they are the thing a
+  person skips; strings and numbers are the thing they are usually hunting for,
+  so those get the accent's neighbours rather than the accent itself — a wall of
+  volt reads as an error state.
+*/
+.tokens { color: var(--color-bone-2); }
+.tokens .tk-comment { color: rgba(233, 230, 223, 0.30); font-style: italic; }
+.tokens .tk-string  { color: #B8E986; }
+.tokens .tk-number  { color: #F0C24B; }
+.tokens .tk-key     { color: #8FB8FF; }
+.tokens .tk-lit     { color: #E39BD8; }
+.tokens .tk-type    { color: #7FE3D0; }
+.tokens .tk-tag     { color: #8FB8FF; }
+.tokens .tk-prop    { color: var(--color-bone); }

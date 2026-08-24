@@ -1,18 +1,15 @@
 import type { NextConfig } from 'next';
+import { analyticsHosts } from './lib/analytics-hosts';
 
 /**
  * Security headers are defaults, not options. The CSP allows exactly the
  * analytics hosts this site was configured with (read from
- * NEXT_PUBLIC_ANALYTICS) and nothing else. Loosen it only with a reason
- * written in the README.
+ * NEXT_PUBLIC_ANALYTICS) and nothing else — the table lives in
+ * lib/analytics-hosts.ts, shared with the loader so the two cannot disagree.
+ * Loosen it only with a reason written in the README.
  */
-const analytics = (process.env.NEXT_PUBLIC_ANALYTICS ?? 'custom').split(',').map((s) => s.trim());
-const scriptHosts: string[] = [];
-const connectHosts: string[] = [];
-if (analytics.includes('vercel')) { scriptHosts.push('https://va.vercel-scripts.com'); connectHosts.push('https://vitals.vercel-insights.com', 'https://va.vercel-scripts.com'); }
-if (analytics.includes('posthog')) { const host = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com'; scriptHosts.push(host, 'https://us-assets.i.posthog.com', 'https://eu-assets.i.posthog.com'); connectHosts.push(host, 'https://us.i.posthog.com', 'https://eu.i.posthog.com'); }
-if (analytics.includes('ga4')) { scriptHosts.push('https://www.googletagmanager.com'); connectHosts.push('https://www.google-analytics.com', 'https://analytics.google.com', 'https://www.googletagmanager.com'); }
-if (analytics.includes('plausible')) { scriptHosts.push('https://plausible.io'); connectHosts.push('https://plausible.io'); }
+const analytics = (process.env.NEXT_PUBLIC_ANALYTICS ?? 'custom').split(',').map((s) => s.trim()).filter(Boolean);
+const { script: scriptHosts, connect: connectHosts } = analyticsHosts(analytics, process.env as Record<string, string | undefined>);
 
 const csp = [
   "default-src 'self'",

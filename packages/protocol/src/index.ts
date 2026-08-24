@@ -441,6 +441,107 @@ export interface DeployState {
 }
 
 /* ---------------------------------------------------------------------------
+   The project's own files
+--------------------------------------------------------------------------- */
+
+export interface FileEntry {
+  /** Relative to the project root, forward slashes. */
+  path: string;
+  name: string;
+  dir: boolean;
+  size: number;
+  at: number;
+  /** Different from the last commit. */
+  changed?: boolean;
+  /** A .env file: shown with values masked until asked for. */
+  secret?: boolean;
+}
+
+export interface FileBody {
+  path: string;
+  text: string;
+  size: number;
+  at: number;
+  /** Which highlighter to use: tsx, ts, json, css, md, env, … */
+  language: string;
+  readOnly: boolean;
+  reason?: string;
+  secret?: boolean;
+}
+
+/** The owner login for the generated CRM at /admin. */
+export interface AdminLogin {
+  email: string;
+  /** Only while the plaintext is still kept on this machine. */
+  password?: string;
+  configured: boolean;
+  path: string;
+}
+
+/* ---------------------------------------------------------------------------
+   Under the hood: what is driving the build
+--------------------------------------------------------------------------- */
+
+/** A plugin, skill, agent, slash command or MCP server Claude Code has been given. */
+export interface EngineExtra { name: string; kind: 'plugin' | 'skill' | 'agent' | 'command' | 'mcp'; where: string; detail?: string }
+
+export interface EngineStage { id: string; label: string; blurb: string; prompt: string }
+
+export interface EngineInfo {
+  projectId: string;
+  claude: { bin: string; model?: string; permissionMode: string; effort?: string };
+  /** The command-line shape a build turn is spawned with. Values are elided. */
+  argv: string[];
+  hooks: Array<{ event: string; does: string }>;
+  /** What the policy refuses, in the person's language. */
+  refuses: string[];
+  extras: EngineExtra[];
+  brief: { text: string; exists: boolean; path: string };
+  stages: EngineStage[];
+}
+
+/* ---------------------------------------------------------------------------
+   Analytics
+--------------------------------------------------------------------------- */
+
+/**
+ * One analytics destination the site can be wired to.
+ *
+ * The catalogue entry says what it is; this says what connecting it involves —
+ * which keys, where to get them, and where the person goes to look at the
+ * numbers afterwards. That last one matters more than it sounds: a site wired
+ * to PostHog shows nothing useful inside Super Builds, and a dashboard that
+ * says nothing is worse than a link that says "your numbers are over here".
+ */
+export interface AnalyticsProviderInfo {
+  id: string;
+  label: string;
+  icon?: string;
+  blurb: string;
+  /** Environment variables it needs, in the order they should be asked for. */
+  fields: Array<{ key: string; label: string; hint?: string; optional?: boolean; placeholder?: string }>;
+  /** Where the person reads their numbers. `{host}` is replaced with the site's domain. */
+  dashboard?: string;
+  /** Where the keys come from. */
+  keysUrl?: string;
+  /** True when the numbers are shown inside the site's own /admin. */
+  builtin?: boolean;
+  /** Free, paid, needs an account — said plainly. */
+  caveat?: string;
+}
+
+export interface AnalyticsState {
+  projectId: string;
+  /** Provider ids currently switched on, as written into NEXT_PUBLIC_ANALYTICS. */
+  enabled: string[];
+  providers: AnalyticsProviderInfo[];
+  /** Which required keys are filled in, by provider id. Names and status only, never values. */
+  filled: Record<string, string[]>;
+  /** The deployed host, when there is one, so dashboard links can point at the real site. */
+  host?: string;
+}
+
+/* ---------------------------------------------------------------------------
    Events the daemon pushes over the socket
 --------------------------------------------------------------------------- */
 
@@ -459,6 +560,7 @@ export type ServerEvent =
   | { type: 'deploy.update'; state: DeployState }
   | { type: 'reference.update'; capture: ReferenceCapture }
   | { type: 'tweaks.update'; state: TweakState }
+  | { type: 'analytics.update'; state: AnalyticsState }
   | { type: 'install.update'; message: string };
 
 /* ---------------------------------------------------------------------------

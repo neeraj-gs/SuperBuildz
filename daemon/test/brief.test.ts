@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { completeSpec, CATALOGUE, defaultsFor, ARCHETYPES, SCENES, PALETTES } from '../src/catalogue/index.ts';
 import * as CATALOGUE_INTENT from '../src/catalogue/intent.ts';
 import { masterBrief, planFor, stagesFor, systemPromptFor, changeBrief, sceneComponent, TYPE_DIRECTION, CHANGES } from '../src/brief.ts';
-import { designConfigSource, fontsSource, hashPassword, localeFor } from '../src/scaffold.ts';
+import { designConfigSource, fontsSource, localeFor } from '../src/scaffold.ts';
+import { hashPassword } from '../src/admin.ts';
 
 test('every archetype default points at real catalogue entries', () => {
   for (const a of ARCHETYPES) {

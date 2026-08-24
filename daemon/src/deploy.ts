@@ -6,7 +6,6 @@
  * lands in Vercel's own store. Then link, push the env, deploy, parse the URL.
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DeployState } from '@superbuilds/protocol';
 import { broadcast } from './bus.ts';
@@ -14,6 +13,8 @@ import { execBin, spawnBin } from './binaries.ts';
 import { openTerminal } from './terminal.ts';
 import { probe } from './install.ts';
 import { getProject, updateProject } from './projects.ts';
+import { DEV_PASSWORD_KEY } from './admin.ts';
+import { envEntries, setEnvValue } from './env.ts';
 
 const states = new Map<string, DeployState>();
 
@@ -29,41 +30,6 @@ function push(projectId: string, patch: Partial<DeployState>) {
   return next;
 }
 
-/** Keys in .env.local, names only. Values never leave the daemon. */
-export function envEntries(projectPath: string): Array<{ key: string; value: string }> {
-  const file = join(projectPath, '.env.local');
-  if (!existsSync(file)) return [];
-  const out: Array<{ key: string; value: string }> = [];
-  for (const raw of readFileSync(file, 'utf8').split('\n')) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#')) continue;
-    const eq = line.indexOf('=');
-    if (eq === -1) continue;
-    const key = line.slice(0, eq).trim();
-    let value = line.slice(eq + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
-    if (key) out.push({ key, value });
-  }
-  return out;
-}
-
-/** Set or replace one key in .env.local. The value passes through memory and is not kept. */
-export function setEnvValue(projectPath: string, key: string, value: string): boolean {
-  if (!/^[A-Z][A-Z0-9_]{1,63}$/.test(key)) return false;
-  const file = join(projectPath, '.env.local');
-  const lines = existsSync(file) ? readFileSync(file, 'utf8').split('\n') : [];
-  const quoted = /[\s#"']/.test(value) ? JSON.stringify(value) : value;
-  let done = false;
-  const next = lines.map((l) => {
-    const m = l.match(/^#?\s*([A-Z][A-Z0-9_]*)=/);
-    if (m && m[1] === key && !done) { done = true; return `${key}=${quoted}`; }
-    return l;
-  });
-  if (!done) next.push(`${key}=${quoted}`);
-  writeFileSync(file, next.join('\n').replace(/\n*$/, '\n'), { mode: 0o600 });
-  return true;
-}
-
 export async function deployStatus(projectId: string): Promise<DeployState> {
   const project = getProject(projectId);
   if (!project) return blank(projectId);
@@ -73,7 +39,7 @@ export async function deployStatus(projectId: string): Promise<DeployState> {
     const who = await execBin('vercel', ['whoami'], { cwd: project.path, timeout: 20_000 });
     if (who.ok && who.out && !/not authenticated|no existing credentials|error/i.test(who.out)) { connected = true; account = who.out.trim().split('\n').at(-1); }
   }
-  const envKeys = envEntries(project.path).map((e) => e.key);
+  const envKeys = envEntries(project.path).map((e) => e.key).filter((k) => k !== DEV_PASSWORD_KEY);
   const cur = states.get(projectId);
   return push(projectId, { cli, connected, account, envKeys, url: cur?.url ?? project.deploy?.url });
 }
@@ -125,6 +91,9 @@ export async function deployProject(projectId: string, target: 'production' | 'p
 
     for (const { key, value } of entries) {
       if (!value) continue;
+      // The plaintext login exists so this machine can show it to you. It has
+      // no business on a host, where the hash is the only credential that counts.
+      if (key === DEV_PASSWORD_KEY) continue;
       onLog(`> vercel env add ${key} ${target} (value not shown)\n`);
       const added = await run(['env', 'add', key, target, '--force'], project.path, () => {}, value + '\n');
       if (!added.ok && !/already exists/i.test(added.out)) onLog(`  could not set ${key}: ${added.out.split('\n').slice(-2).join(' ')}\n`);
@@ -142,3 +111,5 @@ export async function deployProject(projectId: string, target: 'production' | 'p
     return push(projectId, { running: false, error: (err as Error).message });
   }
 }
+
+export { envEntries, setEnvValue };

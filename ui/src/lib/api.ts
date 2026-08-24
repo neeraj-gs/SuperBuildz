@@ -5,7 +5,7 @@
 
 import type {
   Catalogue, Detection, InstallRecipeView, Plan, Project, Session, Spec, GenerationState, PreviewState, DeployState,
-  ReferenceCapture, Choice, TweakState, Tweaks, Direction,
+  ReferenceCapture, Choice, TweakState, Tweaks, Direction, FileEntry, FileBody, AdminLogin, AnalyticsState, EngineInfo,
 } from '@superbuilds/protocol';
 
 let token = '';
@@ -61,6 +61,7 @@ export const api = {
   patchProject: (id: string, body: { name?: string; spec?: Partial<Spec> }) => patch<Project>(`/api/projects/${id}`, body),
   deleteProject: (id: string) => del<{ ok: boolean }>(`/api/projects/${id}`),
   openFolder: (id: string) => post<{ ok: boolean }>(`/api/projects/${id}/open-folder`),
+  openEditor: (id: string) => post<{ ok: boolean; message?: string }>(`/api/projects/${id}/open-editor`),
 
   generate: (id: string) => post<GenerationState>(`/api/projects/${id}/generate`),
   cancelGenerate: (id: string) => post<{ ok: boolean }>(`/api/projects/${id}/generate/cancel`),
@@ -90,6 +91,30 @@ export const api = {
   setTweaks: (id: string, values: Record<string, unknown> | Tweaks, replace = false) =>
     post<TweakState>(`/api/projects/${id}/tweaks`, { values, replace }),
   shuffleTweaks: (id: string) => post<TweakState>(`/api/projects/${id}/tweaks/shuffle`),
+
+  /* The project's own files. `path` is always project-relative. */
+  files: (id: string, path = '') => get<{ path: string; entries: FileEntry[] }>(`/api/projects/${id}/files?path=${encodeURIComponent(path)}`),
+  file: (id: string, path: string) => get<FileBody>(`/api/projects/${id}/file?path=${encodeURIComponent(path)}`),
+  saveFile: (id: string, path: string, text: string) => post<FileBody>(`/api/projects/${id}/file`, { path, text }),
+  newFile: (id: string, path: string, dir = false) => post<FileEntry>(`/api/projects/${id}/file/new`, { path, dir }),
+  deleteFile: (id: string, path: string) => post<{ ok: true }>(`/api/projects/${id}/file/delete`, { path }),
+  revertFile: (id: string, path: string) => post<{ ok: boolean; message: string }>(`/api/projects/${id}/file/revert`, { path }),
+  searchFiles: (id: string, q: string) => get<{ hits: Array<{ path: string; line?: number; text?: string }> }>(`/api/projects/${id}/search?q=${encodeURIComponent(q)}`),
+
+  /* Under the hood */
+  engine: (id: string) => get<EngineInfo>(`/api/projects/${id}/engine`),
+  saveBrief: (id: string, text: string) => post<{ ok: true }>(`/api/projects/${id}/brief`, { text }),
+
+  /* The CRM login */
+  adminLogin: (id: string) => get<AdminLogin>(`/api/projects/${id}/admin`),
+  setAdminPassword: (id: string, password?: string) => post<{ email: string; password: string }>(`/api/projects/${id}/admin/password`, { password }),
+  setAdminEmail: (id: string, email: string) => post<AdminLogin>(`/api/projects/${id}/admin/email`, { email }),
+  forgetAdminPassword: (id: string) => post<AdminLogin>(`/api/projects/${id}/admin/forget`),
+
+  /* Analytics destinations */
+  analytics: (id: string) => get<AnalyticsState>(`/api/projects/${id}/analytics`),
+  setAnalytics: (id: string, ids: string[]) => post<AnalyticsState>(`/api/projects/${id}/analytics`, { ids }),
+  setAnalyticsKeys: (id: string, values: Record<string, string>) => post<AnalyticsState>(`/api/projects/${id}/analytics/keys`, { values }),
 
   deployStatus: (id: string) => get<DeployState>(`/api/projects/${id}/deploy`),
   deployLogin: (id: string) => post<{ ok: boolean; message: string }>(`/api/projects/${id}/deploy/login`),

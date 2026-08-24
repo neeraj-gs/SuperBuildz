@@ -80,3 +80,21 @@ export async function sameOrigin(): Promise<boolean> {
   if (origin && host && !origin.endsWith(`//${host}`)) return false;
   return true;
 }
+
+/**
+ * The login, in the clear, while this site is still being built on somebody's
+ * laptop.
+ *
+ * Super Builds writes ADMIN_DEV_PASSWORD beside the hash so it can show you
+ * your own login instead of telling you to open a file in a text editor, and
+ * strips the key before anything is pushed to a host. Two guards, because one
+ * of them will eventually be wrong: the key has to exist, and NODE_ENV must not
+ * be production. A built site that somehow still carries the key prefills
+ * nothing.
+ */
+export function devLogin(): { email: string; password: string } | null {
+  if (process.env.NODE_ENV === 'production') return null;
+  const password = process.env.ADMIN_DEV_PASSWORD;
+  if (!password) return null;
+  return { email: process.env.ADMIN_EMAIL ?? '', password };
+}

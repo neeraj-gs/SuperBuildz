@@ -32,6 +32,11 @@ import { judge, hookResponse } from './policy.ts';
 import { tweakState, setTweaks, shufflePalette } from './tweaks.ts';
 import { proposeDirections, readDirections, chooseDirection } from './directions.ts';
 import { checkMediaFolder } from './media.ts';
+import { listDir, readProjectFile, writeProjectFile, createProjectFile, deleteProjectFile, revertProjectFile, searchProject } from './files.ts';
+import { adminLogin, setAdminPassword, setAdminEmail, forgetDevPassword } from './admin.ts';
+import { analyticsState, setAnalytics, setAnalyticsKeys } from './analytics.ts';
+import { engineInfo, setBrief } from './engine.ts';
+import { execPlain } from './binaries.ts';
 import { superbuildsHome, uiDist } from './paths.ts';
 
 const PORT = Number(process.env.SUPERBUILDS_PORT ?? 7747);
@@ -154,6 +159,14 @@ app.patch('/api/projects/:id', async (req, reply) => {
   return updateProject(id, { ...(body.name ? { name: body.name } : {}), ...(body.spec ? { spec: completeSpec({ ...p.spec, ...body.spec, folder: p.path }) } : {}) });
 });
 app.delete('/api/projects/:id', async (req) => { const id = (req.params as { id: string }).id; await stopPreview(id); deleteProject(id); return { ok: true }; });
+app.post('/api/projects/:id/open-editor', async (req, reply) => {
+  // Best effort, and it says so: `code` is on PATH for most people who have
+  // VS Code and for nobody who does not, and there is no way to know which
+  // without trying. A failure here is a message, not an error state.
+  const p = getProject((req.params as { id: string }).id); if (!p) return reply.code(404).send({ error: 'no such project' });
+  const r = await execPlain(process.platform === 'win32' ? 'code.cmd' : 'code', [p.path], 15_000);
+  return r.ok ? { ok: true } : { ok: false, message: 'VS Code did not open. It needs the `code` command on your PATH — in VS Code, run “Shell Command: Install code command in PATH”.' };
+});
 app.post('/api/projects/:id/open-folder', async (req, reply) => {
   const p = getProject((req.params as { id: string }).id); if (!p) return reply.code(404).send({ error: 'no such project' });
   const cmd = process.platform === 'win32' ? ['explorer', [p.path]] : process.platform === 'darwin' ? ['open', [p.path]] : ['xdg-open', [p.path]];
@@ -294,6 +307,106 @@ app.post('/api/projects/:id/env', async (req, reply) => {
   if (!key || typeof value !== 'string') return reply.code(400).send({ error: 'key and value are required' });
   const ok = setEnvValue(p.path, key, value);
   return ok ? { ok: true } : reply.code(400).send({ error: 'That is not a valid variable name.' });
+});
+
+/* The project's own files: browse, read, edit, revert */
+
+function projectOr404(id: string, reply: { code: (n: number) => { send: (b: unknown) => unknown } }) {
+  const p = getProject(id);
+  if (!p) { reply.code(404).send({ error: 'no such project' }); return undefined; }
+  return p;
+}
+
+app.get('/api/projects/:id/files', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  try { return await listDir(p.path, String((req.query as { path?: string }).path ?? '')); }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.get('/api/projects/:id/file', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  try { return readProjectFile(p.path, String((req.query as { path?: string }).path ?? '')); }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.post('/api/projects/:id/file', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  const { path, text } = (req.body ?? {}) as { path?: string; text?: string };
+  try { return writeProjectFile(p.path, String(path ?? ''), String(text ?? '')); }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.post('/api/projects/:id/file/new', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  const { path, dir } = (req.body ?? {}) as { path?: string; dir?: boolean };
+  try { return createProjectFile(p.path, String(path ?? ''), dir === true); }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.post('/api/projects/:id/file/delete', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  try { return deleteProjectFile(p.path, String((req.body as { path?: string })?.path ?? '')); }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.post('/api/projects/:id/file/revert', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  try { return await revertProjectFile(p.path, String((req.body as { path?: string })?.path ?? '')); }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.get('/api/projects/:id/search', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  return { hits: searchProject(p.path, String((req.query as { q?: string }).q ?? '')) };
+});
+
+/* The CRM login, so nobody is locked out of their own customer data */
+
+app.get('/api/projects/:id/admin', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  return adminLogin(p.path);
+});
+app.post('/api/projects/:id/admin/password', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  try { return setAdminPassword(p.path, (req.body as { password?: string })?.password); }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.post('/api/projects/:id/admin/email', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  try { return setAdminEmail(p.path, String((req.body as { email?: string })?.email ?? '')); }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.post('/api/projects/:id/admin/forget', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  return forgetDevPassword(p.path);
+});
+
+/* Analytics: which destinations are on, their keys, and where to read them */
+
+app.get('/api/projects/:id/analytics', async (req, reply) => {
+  try { return analyticsState((req.params as { id: string }).id); }
+  catch (err) { return reply.code(404).send({ error: (err as Error).message }); }
+});
+app.post('/api/projects/:id/analytics', async (req, reply) => {
+  const { ids } = (req.body ?? {}) as { ids?: string[] };
+  try {
+    const state = setAnalytics((req.params as { id: string }).id, Array.isArray(ids) ? ids.map(String) : []);
+    broadcast({ type: 'analytics.update', state });
+    return state;
+  } catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+app.post('/api/projects/:id/analytics/keys', async (req, reply) => {
+  const { values } = (req.body ?? {}) as { values?: Record<string, string> };
+  try {
+    const state = setAnalyticsKeys((req.params as { id: string }).id, values ?? {});
+    broadcast({ type: 'analytics.update', state });
+    return state;
+  } catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+});
+
+/* Under the hood: what is driving the build, and the prompt it is driving with */
+
+app.get('/api/projects/:id/engine', async (req, reply) => {
+  try { return engineInfo((req.params as { id: string }).id); }
+  catch (err) { return reply.code(404).send({ error: (err as Error).message }); }
+});
+app.post('/api/projects/:id/brief', async (req, reply) => {
+  try { return setBrief((req.params as { id: string }).id, String((req.body as { text?: string })?.text ?? '')); }
+  catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
 });
 
 /* Hooks from Claude Code */

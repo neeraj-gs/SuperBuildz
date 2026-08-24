@@ -164,6 +164,46 @@ multiplying it in JavaScript is order-dependent and silently produced
 `design.config.ts`, or a light direction renders a pale page with a black hero
 sitting in it.
 
+## 5c. Getting at your own project: files, the CRM login, analytics, the prompt
+
+Four things were unreachable from inside the tool, and all four had the same
+shape: the product knew the answer and would not show it.
+
+**The files.** `daemon/src/files.ts` lists, reads, writes, creates, deletes and
+reverts anything inside the project folder; `ui/src/features/workspace/Files.tsx`
+is a tree, tabs and an editor. The editor is a highlighted `<pre>` in normal
+flow with a transparent `<textarea>` exactly on top of it, both driven from one
+`TYPE` object so their metrics cannot drift apart. Highlighting is a regex
+tokeniser (`highlight.ts`) covering tsx/ts/js, json, css, md, env and html —
+about a hundred lines, against roughly three hundred kilobytes for a real
+grammar, for a job that is "stop this being one grey wall".
+
+Revert is `git checkout -- <path>`, which is honest about what it can do: every
+generated project is a git repository from its first second.
+
+**The CRM login.** `daemon/src/admin.ts`. The password is now kept beside the
+hash while the site is local, so the tool can show it, set a new one, or forget
+it; `templates/site/lib/auth.ts` grew `devLogin()` and the login form prefills
+from it. The trade is written out in both files and in SECURITY.md.
+
+**Analytics.** `daemon/src/analytics.ts` is the registry: twelve destinations,
+each with the environment variables it needs, where to get them, and the URL of
+the dashboard where the numbers actually live. The wizard's list is derived from
+it (`analyticsChoices()`) so a provider cannot be offered that the site does not
+know how to load, and `scaffold.ts` asks it which keys to stub. Only the
+built-in provider reports into a dashboard Super Builds can render; for the
+other eleven the honest answer is a deep link, and that is what the panel shows.
+
+**The prompt.** `daemon/src/engine.ts` returns the exact text of every stage
+turn, the command-line shape, the hooks, what the policy refuses, and the
+plugins, skills, agents, commands and MCP servers found in `~/.claude` and the
+project's own `.claude`. `BRIEF.md` is editable there, because a document that
+decides what gets built and cannot be read is a document nobody can argue with.
+
+`scripts/walk.mjs` presses through all of it and reports console errors per
+panel — the routes were already covered by `shot.mjs`, and every recent bug has
+been behind a button.
+
 ## 6. The chat after generation
 
 The same session continues as a conversation: a message, a streamed reply,
