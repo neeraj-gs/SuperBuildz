@@ -445,6 +445,37 @@ Under `prefers-reduced-motion` the pinned section becomes four ordinary blocks,
 every ticker holds still, and the scene stops easing and stops following the
 pointer: it is where the scroll says it is and nothing moves on its own.
 
+### How you get it, and who to ask (`ui/src/features/landing/Contact.tsx`)
+
+The page argued the product well and then ended without saying how anybody
+would obtain it, or who to write to when it went wrong. Both halves are one
+section because they are one question: there is no download page, no account
+and no billing screen, so "how do I get this" and "who do I ask" have the same
+answer, and a Download section walled off from a Contact section puts a
+partition between a question and the person who can settle it.
+
+The two deliveries are a **choice**, not two paragraphs. `npm start` builds the
+interface, starts the daemon and opens its own window — the Chrome already on
+the machine, in app mode, because a local tool has no business downloading a
+second browser to draw itself. `node daemon/src/index.ts` is the same program
+with no interface at all: Fastify and a websocket on `127.0.0.1:7747`, which is
+the entire API every screen in the app is built on, so anything the interface
+can do somebody's own code can do. Pressing one shows exactly what to type,
+what happens and what it needs. A section about a product whose argument is
+"press things instead of typing them" cannot itself be a wall of prose.
+
+It says plainly that there is no public download yet, because there is not, and
+a contact section that implies otherwise turns the first email into a
+complaint.
+
+The contact details are Neeraj GS's, and they are the same five that
+powerhouz.org carries — email, portfolio, LinkedIn, X, GitHub — shown as
+labelled rows rather than a strip of icons, because there is no recognisable
+glyph for a portfolio and five unlabelled marks make somebody guess. The email
+is first and carries a copy button: a `mailto:` on a machine with no mail
+client configured opens nothing at all and looks broken. The footer repeats
+four of them for somebody who scrolled past.
+
 ## 6c. Ports, and the day one literal broke the product three ways
 
 Worth writing down because the failure was so much larger than the cause, and

@@ -45,6 +45,7 @@ import { Steps } from './Steps';
 import { Scenes } from './Scenes';
 import { Crm } from './Crm';
 import { Parallel } from './Parallel';
+import { Contact } from './Contact';
 
 const Spine = lazy(() => import('./Spine').then((m) => ({ default: m.Spine })));
 
@@ -306,12 +307,29 @@ export function Landing() {
           </div>
         </section>
 
+        {/* -------------------------------------------------------- Contact -- */}
+        <Contact />
+
         <footer className="border-t border-line py-8 bg-ink/80 backdrop-blur-sm">
-          <div className="shell-wide flex flex-wrap items-center justify-between gap-4">
+          <div className="shell-wide flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
             <Logo />
-            <span className="telemetry text-bone-4">
+            <span className="telemetry text-bone-4 order-3 md:order-none">
               Claude Code · React Three Fiber · Next.js · GSAP · Drizzle. Everything runs here.
             </span>
+            {/* The same four addresses as the contact section, for somebody who
+                scrolled past it and is now at the bottom looking for them. */}
+            <nav className="flex items-center gap-4">
+              {[
+                ['Email', 'mailto:gsneeraj2002@gmail.com?subject=Super%20Builds'],
+                ['Portfolio', 'https://www.neerajgs.dev/'],
+                ['GitHub', 'https://github.com/neeraj-gs'],
+                ['PowerHouz', 'https://www.powerhouz.org/'],
+              ].map(([label, href]) => (
+                <a key={label} href={href} target="_blank" rel="noreferrer noopener" className="telemetry text-bone-3 hover:text-bone transition-colors">
+                  {label}
+                </a>
+              ))}
+            </nav>
           </div>
         </footer>
       </div>
