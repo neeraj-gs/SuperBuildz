@@ -16,15 +16,23 @@ export type Route =
   | { name: 'projects' }
   | { name: 'new'; from?: string }
   | { name: 'revamp' }
-  | { name: 'project'; id: string };
+  // The board, optionally narrowed to one project — which is how the workspace
+  // opens it, and why the filter is in the path rather than in a component's
+  // own state: it survives a reload and can be linked to.
+  | { name: 'sessions'; project?: string }
+  // `session` is which conversation to land on, set when the board opens one.
+  | { name: 'project'; id: string; session?: string };
 
 function parseRoute(path: string): Route {
   if (path === '/setup') return { name: 'setup' };
   if (path === '/projects') return { name: 'projects' };
   if (path === '/new') return { name: 'new' };
   if (path === '/revamp') return { name: 'revamp' };
-  const m = path.match(/^\/p\/([^/]+)/);
-  if (m) return { name: 'project', id: m[1] };
+  if (path === '/sessions') return { name: 'sessions' };
+  const b = path.match(/^\/sessions\/p\/([^/]+)/);
+  if (b) return { name: 'sessions', project: b[1] };
+  const m = path.match(/^\/p\/([^/]+)(?:\/c\/([^/]+))?/);
+  if (m) return { name: 'project', id: m[1], session: m[2] };
   return { name: 'landing' };
 }
 export function pathFor(r: Route): string {
@@ -33,7 +41,8 @@ export function pathFor(r: Route): string {
     case 'projects': return '/projects';
     case 'new': return '/new';
     case 'revamp': return '/revamp';
-    case 'project': return `/p/${r.id}`;
+    case 'sessions': return r.project ? `/sessions/p/${r.project}` : '/sessions';
+    case 'project': return r.session ? `/p/${r.id}/c/${r.session}` : `/p/${r.id}`;
     default: return '/';
   }
 }

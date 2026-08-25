@@ -361,6 +361,51 @@ The daemon writes the log rather than asking the model to, because a model asked
 to maintain a shared file will do it beautifully for three turns and then stop,
 and nothing will notice.
 
+### The board (`daemon/src/board.ts`, `ui/src/features/board/Board.tsx`)
+
+All of the above was real and invisible. A conversation could only be reached by
+opening the project it belonged to and finding its tab, so somebody with four
+builds going had four places to look, no total, and no way to answer "is
+anything still working" except by clicking through everything. The product's own
+landing page claimed parallelism the product would not show you.
+
+`GET /api/sessions` answers with a `SessionCard` per conversation — title,
+counts, one trimmed line of what was last said — deliberately not a `Session`,
+which carries every turn it has ever had with its tool calls. Forty conversations
+would be megabytes of transcript to draw forty cards that show one line each.
+
+Four lanes, and **every one is derived, never set**:
+
+| Lane | What puts it there |
+| --- | --- |
+| Working now | a turn in flight, from the live process map |
+| In line | a place in `capacity.ts`'s queue |
+| Your move | it replied and stopped, it failed, or nothing has been said in it yet |
+| Earlier | untouched for a day or more |
+
+A board whose columns are dragged by hand is wrong by Thursday: it records what
+somebody last remembered to move rather than what is happening. Nothing here is
+a field anybody maintains, which is also why it cannot go stale — and why there
+is no drag, because there is nowhere a person could put a card that would mean
+anything. `laneFor` is pure and `daemon/test/board.test.ts` covers every branch
+of it, including the day boundary in both directions.
+
+A lane with nothing in it is not drawn. Four fixed columns was the obvious build
+and it was wrong for the ordinary case: one idle conversation produced three
+columns reading "Nothing is running", "Nothing is waiting", "Nothing is waiting
+on you" — three negatives to say one thing, around a single real card squeezed
+into a quarter of the page. The grid is sized to the lanes that have something
+and what the empty ones were saying is said once, in a line, underneath. The
+load meter is drawn only when there is load: six empty cells is a diagram of an
+absence.
+
+The board is reachable from the header (with a count, so three running builds
+are visible without opening anything), from the session tab bar, and from the
+queue line — and `/sessions/p/<id>` is the same board narrowed to one project,
+in the path rather than in component state so it survives a reload and can be
+linked to. Opening a card lands on `/p/<id>/c/<sid>`, that conversation and not
+the project's default one.
+
 ## 6b. The tool's own front door
 
 The landing page is the product's first argument, and for a while it was the

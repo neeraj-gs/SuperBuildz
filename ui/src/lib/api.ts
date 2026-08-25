@@ -5,7 +5,7 @@
 
 import type {
   Catalogue, Detection, InstallRecipeView, Plan, Project, Session, Spec, GenerationState, PreviewState, DeployState,
-  ReferenceCapture, Choice, TweakState, Tweaks, Direction, FileEntry, FileBody, AdminLogin, AnalyticsState, EngineInfo, SiteSurvey, Understanding, Capacity, ProjectMemory,
+  ReferenceCapture, Choice, TweakState, Tweaks, Direction, FileEntry, FileBody, AdminLogin, AnalyticsState, EngineInfo, SiteSurvey, Understanding, Capacity, ProjectMemory, SessionBoard,
 } from '@superbuilds/protocol';
 
 let token = '';
@@ -109,6 +109,8 @@ export const api = {
 
   /* Several conversations at once, and the notebook they share */
   capacity: () => get<Capacity>('/api/capacity'),
+  /** Every conversation on this machine, summarised, for the board. */
+  board: () => get<SessionBoard>('/api/sessions'),
   sessions: (id: string) => get<Session[]>(`/api/projects/${id}/sessions`),
   newSession: (id: string, title?: string) => post<Session>(`/api/projects/${id}/sessions`, { title }),
   renameSession: (sid: string, title: string) => patch<Session>(`/api/sessions/${sid}`, { title }),

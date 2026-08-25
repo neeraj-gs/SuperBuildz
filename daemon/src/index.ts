@@ -41,6 +41,7 @@ import { memory, setMemory } from './memory.ts';
 import { surveySite } from './survey.ts';
 import { browse, pickFolder } from './picker.ts';
 import { hostAllowed, needsToken, originAllowed } from './origins.ts';
+import { sessionBoard } from './board.ts';
 import { legiblePalette } from './colour.ts';
 import { understandPrompt, UNDERSTAND_SCHEMA, revampPlan } from './revamp.ts';
 import { execPlain } from './binaries.ts';
@@ -553,6 +554,15 @@ function capacityNow() {
   return { running: listProjects().reduce((n, p) => n + listSessions(p.id).filter((s) => sessionIsBusy(s.id)).length, 0), ceiling: ceiling(), waiting: queued() };
 }
 app.get('/api/capacity', async () => capacityNow());
+
+/**
+ * Every conversation on this machine, for the board.
+ *
+ * One route rather than one per project: the question the board asks is "what
+ * is this machine doing", and asking it project by project is both N requests
+ * and a total nobody can compute without all of them anyway.
+ */
+app.get('/api/sessions', async () => sessionBoard(sessionIsBusy));
 
 app.get('/api/projects/:id/sessions', async (req, reply) => {
   const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;

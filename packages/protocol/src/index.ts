@@ -488,6 +488,51 @@ export interface Capacity {
   waiting: Array<{ sessionId: string; projectId: string; title: string; position: number }>;
 }
 
+/**
+ * Where a conversation sits on the board.
+ *
+ * Four lanes, and each one is a fact rather than a mood: something is running,
+ * something is in line behind the machine's ceiling, something is waiting on a
+ * person, something has not been touched today. Nothing here is a status a
+ * person sets — a board you have to keep tidy by hand is a second job.
+ */
+export type Lane = 'running' | 'queued' | 'you' | 'resting';
+
+/**
+ * One conversation, small enough to hold hundreds of.
+ *
+ * Deliberately not a `Session`: a session carries every turn it has ever had,
+ * with tool calls, and a board asking for forty of those would move megabytes
+ * to draw forty cards. This is what a card shows and nothing else.
+ */
+export interface SessionCard {
+  id: string;
+  projectId: string;
+  projectName: string;
+  title: string;
+  lane: Lane;
+  status: SessionStatus;
+  createdAt: number;
+  updatedAt: number;
+  /** A turn is in flight in this one right now. */
+  busy: boolean;
+  /** Its place in line, when the machine is at its ceiling. */
+  place?: number;
+  turns: number;
+  costUsd: number;
+  model?: string;
+  /** The last thing said, trimmed to a line, so a card is recognisable. */
+  last?: { role: 'user' | 'assistant' | 'system'; text: string; at: number };
+  /** The last turn ended in an error. */
+  failed?: boolean;
+}
+
+/** Every conversation on this machine, and what the machine is carrying. */
+export interface SessionBoard {
+  cards: SessionCard[];
+  capacity: Capacity;
+}
+
 /** The notebook every conversation about a project reads. */
 export interface ProjectMemory {
   projectId: string;

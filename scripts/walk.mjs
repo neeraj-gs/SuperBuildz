@@ -120,6 +120,27 @@ if (await addTab.count()) {
   }
 } else { console.log('  MISSING: the new-conversation button'); failures++; }
 
+/* The board: every conversation on the machine, and the same board narrowed. */
+
+await page.goto(`${base}/sessions`, { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(1800);
+const lanes = await page.locator('section h2').count();
+if (lanes) await shot('board-all', `the board — ${lanes} lane${lanes === 1 ? '' : 's'} with something in`);
+else { console.log('  MISSING: the session board'); failures++; }
+
+await page.goto(`${base}/sessions/p/${id}`, { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(1600);
+if (await page.getByRole('button', { name: /New conversation/ }).count()) await shot('board-project', 'the board, narrowed to one project');
+else { console.log('  MISSING: the board narrowed to a project'); failures++; }
+
+// A card has to open its own conversation, not the project's default one.
+const card = page.locator('[role="button"][tabindex="0"]').first();
+if (await card.count()) {
+  await card.click();
+  await page.waitForTimeout(2000);
+  if (!/^\/p\/[^/]+\/c\/[^/]+$/.test(new URL(page.url()).pathname)) { console.log('  MISSING: a card did not open its own conversation'); failures++; }
+} else { console.log('  MISSING: any card on the board'); failures++; }
+
 /* The wizard: the screens that used to take thirteen presses to get back to. */
 
 await page.goto(`${base}/new`, { waitUntil: 'domcontentloaded' });

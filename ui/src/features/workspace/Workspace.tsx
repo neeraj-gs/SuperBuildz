@@ -49,12 +49,15 @@ type DeviceId = typeof DEVICES[number]['id'];
 
 type View = 'site' | 'admin' | 'files';
 
-export function Workspace({ id }: { id: string }) {
+export function Workspace({ id, session: wanted }: { id: string; session?: string }) {
   const project = useStore((s) => s.projects[id]);
   const generation = useStore((s) => s.generations[id]);
   const preview = useStore((s) => s.previews[id]);
   const sessions = useStore((s) => s.sessions);
-  const [sessionId, setSessionId] = useState<string | undefined>(project?.sessionId);
+  // `wanted` is in the path when the board opened a particular conversation, so
+  // landing on the project's default one instead would silently ignore the card
+  // that was pressed.
+  const [sessionId, setSessionId] = useState<string | undefined>(wanted ?? project?.sessionId);
 
   const [view, setView] = useState<View>('site');
   const [device, setDevice] = useState<DeviceId>('fit');
@@ -86,6 +89,9 @@ export function Workspace({ id }: { id: string }) {
   }, [project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (project?.sessionId && !sessionId) { setSessionId(project.sessionId); } }, [project?.sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Pressing another card while a project is already open changes the path but
+  // not the component, so the choice has to be watched as well as seeded.
+  useEffect(() => { if (wanted && wanted !== sessionId) setSessionId(wanted); }, [wanted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Only the conversation in front of you is fetched in full; the tabs carry
   // the rest as summaries until one is picked.

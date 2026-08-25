@@ -28,7 +28,7 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@superbuilds/protocol';
 import { api } from '@/lib/api';
-import { useStore, toast, ask, askText } from '@/lib/store';
+import { useStore, toast, ask, askText, navigate } from '@/lib/store';
 import { Button, Spinner, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
@@ -103,6 +103,7 @@ export function SessionTabs({ projectId, activeId, onPick, onNotes }: {
       <div className="h-9 shrink-0 flex items-center justify-between gap-2 px-2 border-b border-line">
         <span className="telemetry text-bone-4 pl-1 truncate">{sessions[0]?.title ?? 'Conversation'}</span>
         <span className="flex items-center gap-1 shrink-0">
+          <Button size="sm" variant="quiet" icon="grid" onClick={() => navigate({ name: 'sessions', project: projectId })} title="Every conversation about this project, on one board" />
           <Button size="sm" variant="quiet" icon="book" onClick={onNotes} title="Shared notes every conversation reads">Notes</Button>
           <Button size="sm" variant="quiet" icon="plus" busy={busy} onClick={add} title="Another conversation about this project" />
         </span>
@@ -139,15 +140,23 @@ export function SessionTabs({ projectId, activeId, onPick, onNotes }: {
         })}
         <span className="flex-1" />
         <span className="flex items-center gap-1 pb-1 shrink-0">
+          {/* Tabs stop being a way to see everything at about five. The board
+              is the same conversations with what each is doing, and is where
+              the queue reads properly. */}
+          <Button size="sm" variant="quiet" icon="grid" onClick={() => navigate({ name: 'sessions', project: projectId })} title="Every conversation about this project, on one board" />
           <Button size="sm" variant="quiet" icon="book" onClick={onNotes} title="Shared notes every conversation reads">Notes</Button>
           <Button size="sm" variant="quiet" icon="plus" busy={busy} onClick={add} title="Another conversation about this project" />
         </span>
       </div>
 
       {capacity && capacity.waiting.length > 0 && (
-        <p className="px-3 py-1.5 telemetry text-warn border-t border-line">
+        <button
+          onClick={() => navigate({ name: 'sessions' })}
+          className="w-full text-left px-3 py-1.5 telemetry text-warn border-t border-line hover:text-bone"
+          title="See everything this machine is carrying"
+        >
           {capacity.running} of {capacity.ceiling} running · {capacity.waiting.length} waiting. They start on their own.
-        </p>
+        </button>
       )}
     </div>
   );

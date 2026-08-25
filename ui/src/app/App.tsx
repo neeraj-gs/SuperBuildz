@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore, connect, navigate } from '@/lib/store';
 import { Toasts, Logo, Button, Dot, cx } from '@/components/ui';
+import { Icon } from '@/components/icons';
 import { Dialogs } from '@/components/Dialog';
 import { Connection } from '@/components/Connection';
 import { Landing } from '@/features/landing/Landing';
@@ -9,6 +10,7 @@ import { Dashboard } from '@/features/dashboard/Dashboard';
 import { Wizard } from '@/features/wizard/Wizard';
 import { Workspace } from '@/features/workspace/Workspace';
 import { Revamp } from '@/features/revamp/Revamp';
+import { Board } from '@/features/board/Board';
 
 /**
  * One shell, one header. The header is defined here and nowhere else — an
@@ -30,7 +32,7 @@ export function App() {
 
   // The workspace owns its whole viewport: its own header, its own scroll.
   if (route.name === 'project') {
-    return (<><Workspace id={route.id} /><Toasts /><Dialogs /></>);
+    return (<><Workspace id={route.id} session={route.session} /><Toasts /><Dialogs /></>);
   }
 
   const overlay = route.name === 'landing';
@@ -44,6 +46,7 @@ export function App() {
         {route.name === 'projects' && <Dashboard />}
         {route.name === 'new' && <Wizard />}
         {route.name === 'revamp' && <Revamp />}
+        {route.name === 'sessions' && <Board key={route.project ?? 'all'} project={route.project} />}
       </main>
       <Toasts />
       <Dialogs />
@@ -54,7 +57,9 @@ export function App() {
 function TopBar({ overlay }: { overlay: boolean }) {
   const route = useStore((s) => s.route);
   const detection = useStore((s) => s.detection);
+  const capacity = useStore((s) => s.capacity);
   const ready = detection?.ok;
+  const live = capacity?.running ?? 0;
 
   /*
     The landing page's header floats over its own hero, which only works while
@@ -89,6 +94,15 @@ function TopBar({ overlay }: { overlay: boolean }) {
             <span className="hidden sm:inline">Requirements</span>
           </NavLink>
           <NavLink on={route.name === 'projects'} onClick={() => navigate({ name: 'projects' })}>Projects</NavLink>
+          {/* The count is the point: a header that says "3" while three builds
+              run is the only place the parallelism is visible without opening
+              anything. Absent when nothing is running, so it never reads as a
+              badge that is always on. */}
+          <NavLink on={route.name === 'sessions'} onClick={() => navigate({ name: 'sessions' })}>
+            <span className="hidden sm:inline">Sessions</span>
+            <span className="sm:hidden"><Icon name="chat" size={14} /></span>
+            {live > 0 && <span className="telemetry text-volt">{live}</span>}
+          </NavLink>
           {/* On a narrow screen the four controls were 516px wide on a 390px
               phone and the last one simply left the building. The words go
               first; the actions stay. */}
