@@ -17,6 +17,7 @@ import { capturesDir, thumbsDir } from './store.ts';
 import { broadcast } from './bus.ts';
 import { askOnce } from './claude.ts';
 import { dnaPrompt, DNA_SCHEMA } from './brief.ts';
+import { legiblePalette } from './colour.ts';
 import { playwrightBrowserPresent } from './detection.ts';
 import { getProject, updateProject } from './projects.ts';
 import { previewState } from './preview.ts';
@@ -121,8 +122,18 @@ async function runCapture(id: string, url: string) {
       cwd: dir, prompt: dnaPrompt(url, absShots, summary), schema: DNA_SCHEMA, model: 'sonnet', maxBudgetUsd: 1.0,
       allowedTools: ['Read'], timeoutMs: 240_000,
     });
-    writeFileSync(join(dir, 'dna.json'), JSON.stringify(dna, null, 2));
-    push(id, { status: 'done', dna });
+    /*
+      The sampled five are repaired before anybody is offered them.
+
+      Reading "the page ground" and "the body text" off a site that inverts
+      halfway down is genuinely ambiguous, and what comes back can be a light
+      ground with light text. Pressing "its colours" and getting a page nobody
+      can read is not a design decision, so the arithmetic is done here rather
+      than asked for in the prompt.
+    */
+    const fixed: DesignDNA = { ...dna, customPalette: legiblePalette(dna.customPalette) };
+    writeFileSync(join(dir, 'dna.json'), JSON.stringify(fixed, null, 2));
+    push(id, { status: 'done', dna: fixed });
   } catch (err) {
     push(id, { status: 'failed', error: `Could not capture ${url}: ${(err as Error).message.split('\n')[0]}` });
   } finally {

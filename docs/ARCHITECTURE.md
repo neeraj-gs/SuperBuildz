@@ -207,7 +207,7 @@ been behind a button.
 ## 5c-ii. Choosing a folder
 
 `daemon/src/picker.ts`. Revamp asked people to paste a path like
-`C:\\Users\\you\\code\\the-site`, which is a thing graphical computers
+`C:\Users\you\code\the-site`, which is a thing graphical computers
 have not required anybody to know since about 1994 — and getting it wrong
 reads as "that is not a website I can read", which sounds like a verdict on
 their site rather than a typo.

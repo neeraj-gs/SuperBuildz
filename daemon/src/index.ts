@@ -40,6 +40,7 @@ import { ceiling, queued, onQueueChange } from './capacity.ts';
 import { memory, setMemory } from './memory.ts';
 import { surveySite } from './survey.ts';
 import { browse, pickFolder } from './picker.ts';
+import { legiblePalette } from './colour.ts';
 import { understandPrompt, UNDERSTAND_SCHEMA, revampPlan } from './revamp.ts';
 import { execPlain } from './binaries.ts';
 import { superbuildsHome, uiDist } from './paths.ts';
@@ -197,6 +198,11 @@ app.post('/api/revamp/understand', async (req, reply) => {
       allowedTools: ['Read', 'Glob', 'Grep'],
       timeoutMs: 300_000,
     });
+    // Their own brand colours get the same repair a reference site's do: a
+    // sampled pair that cannot be read is a bug wherever it came from.
+    if (understanding && typeof understanding === 'object' && 'customPalette' in understanding) {
+      understanding.customPalette = legiblePalette(understanding.customPalette as Record<string, string>);
+    }
     return { survey, understanding };
   } catch (err) {
     // A failed reading is not a failed revamp: the survey alone is enough to
