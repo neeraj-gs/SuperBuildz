@@ -65,9 +65,26 @@ export interface Ask {
   resolve: (v: string | boolean | null) => void;
 }
 
+/**
+ * What the socket is doing.
+ *
+ * `connected` used to be the whole story, and the whole interface it bought was
+ * the word "daemon offline" in the corner — true, useless, and hidden on a
+ * phone. It was showing for a reason nothing on screen could have told anybody:
+ * the interface had moved to another port and the daemon was refusing the
+ * socket on the old one. So the state now carries what a probe found, and the
+ * badge says it.
+ */
+export type Link = 'connecting' | 'live' | 'down';
+
 interface State {
   route: Route;
   connected: boolean;
+  link: Link;
+  /** What is wrong, in a sentence, when `link` is 'down'. */
+  linkNote: string;
+  /** Attempts since the last time it was live. Shown so a long outage looks like one. */
+  linkTries: number;
   token: string;
   detection?: Detection;
   catalogue?: Catalogue;
@@ -101,6 +118,9 @@ let toastSeq = 1;
 export const useStore = create<State>((set, get) => ({
   route: parseRoute(window.location.pathname),
   connected: false,
+  link: 'connecting',
+  linkNote: '',
+  linkTries: 0,
   token: '',
   projects: {},
   sessions: {},
@@ -140,7 +160,7 @@ export const useStore = create<State>((set, get) => ({
 
   apply: (ev) => {
     switch (ev.type) {
-      case 'hello': setToken(ev.token); set({ token: ev.token, connected: true }); break;
+      case 'hello': setToken(ev.token); set({ token: ev.token, connected: true, link: 'live', linkNote: '', linkTries: 0 }); break;
       case 'detection': set({ detection: ev.detection }); break;
       case 'project.upsert': set((s) => ({ projects: { ...s.projects, [ev.project.id]: ev.project } })); break;
       case 'project.remove': set((s) => { const p = { ...s.projects }; delete p[ev.projectId]; return { projects: p }; }); break;
@@ -184,16 +204,74 @@ export const useStore = create<State>((set, get) => ({
 
 let socket: WebSocket | null = null;
 let backoff = 500;
+let retry: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * Why the socket is not up, asked of the daemon rather than guessed.
+ *
+ * The two cases look identical from inside the interface and want completely
+ * different sentences: nothing is listening at all, or something is listening
+ * and would not take the socket. The second is what a port change produces, and
+ * it is the one that used to be unexplainable.
+ */
+const GONE = 'Nothing is answering on this address. The daemon has stopped — start it again with npm run dev in the project folder.';
+
+async function diagnose(): Promise<string> {
+  try {
+    const res = await fetch('/api/health', { cache: 'no-store' });
+    // Only the daemon's own answer counts as the daemon answering. In
+    // development the interface is served by Vite, which proxies to the daemon
+    // and answers 500 itself when there is nothing to proxy to — so a status
+    // code alone reported a dead daemon as a daemon returning an error, which
+    // is precisely the sort of confident wrong sentence this whole thing exists
+    // to stop.
+    const alive = res.ok && (await res.text()).includes('"ok"');
+    return alive
+      ? 'The daemon is running, but it would not take the live connection. Reloading the page usually settles it; if it does not, stop and restart with npm run dev.'
+      : GONE;
+  } catch {
+    return GONE;
+  }
+}
 
 export function connect() {
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+  clearTimeout(retry);
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   socket = new WebSocket(`${proto}://${window.location.host}/ws`);
   socket.onopen = () => { backoff = 500; };
   socket.onmessage = (m) => { try { useStore.getState().apply(JSON.parse(m.data) as ServerEvent); } catch { /* ignore */ } };
-  socket.onclose = () => { useStore.setState({ connected: false }); setTimeout(connect, backoff); backoff = Math.min(backoff * 1.8, 8000); };
+  socket.onclose = () => {
+    const tries = useStore.getState().linkTries + 1;
+    useStore.setState({ connected: false, link: 'down', linkTries: tries });
+    // Only ask on the first failure and then occasionally: the point is one
+    // good sentence, not a health check every second of an outage.
+    if (tries === 1 || tries % 5 === 0) void diagnose().then((linkNote) => { if (!useStore.getState().connected) useStore.setState({ linkNote }); });
+    retry = setTimeout(connect, backoff);
+    backoff = Math.min(backoff * 1.8, 8000);
+  };
   socket.onerror = () => { try { socket?.close(); } catch {} };
 }
+
+/** Try again now, rather than at the end of the backoff. */
+export function reconnect() {
+  backoff = 500;
+  useStore.setState({ link: 'connecting' });
+  try { socket?.close(); } catch {}
+  socket = null;
+  connect();
+}
+
+/*
+  A laptop that slept, or wifi that came back, has a dead socket and no event
+  to tell it so — the close arrives when the tab wakes and the backoff may be at
+  its eight-second ceiling. Both of these are the moment somebody is looking at
+  the screen again, which is exactly when waiting is least acceptable.
+*/
+window.addEventListener('online', () => { if (!useStore.getState().connected) reconnect(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !useStore.getState().connected) reconnect();
+});
 
 window.addEventListener('popstate', () => useStore.setState({ route: parseRoute(window.location.pathname) }));
 

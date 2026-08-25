@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore, connect, navigate } from '@/lib/store';
 import { Toasts, Logo, Button, Dot, cx } from '@/components/ui';
 import { Dialogs } from '@/components/Dialog';
+import { Connection } from '@/components/Connection';
 import { Landing } from '@/features/landing/Landing';
 import { Setup } from '@/features/setup/Setup';
 import { Dashboard } from '@/features/dashboard/Dashboard';
@@ -52,7 +53,6 @@ export function App() {
 
 function TopBar({ overlay }: { overlay: boolean }) {
   const route = useStore((s) => s.route);
-  const connected = useStore((s) => s.connected);
   const detection = useStore((s) => s.detection);
   const ready = detection?.ok;
 
@@ -98,7 +98,7 @@ function TopBar({ overlay }: { overlay: boolean }) {
           <Button variant="primary" size="sm" icon="plus" className="ml-1.5" onClick={() => navigate({ name: 'new' })} title="Build a new site">
             <span>New<span className="hidden sm:inline"> site</span></span>
           </Button>
-          {!connected && <span className="telemetry text-danger ml-2 hidden md:inline">daemon offline</span>}
+          <Connection className="ml-1.5" />
         </nav>
       </div>
     </header>
