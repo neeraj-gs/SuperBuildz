@@ -67,7 +67,10 @@ export function Logo({ size = 20, wordmark = true }: { size?: number; wordmark?:
         <Icon name="logo" size={size - 4} strokeWidth={2.4} />
       </span>
       {wordmark && (
-        <span className="font-[family-name:var(--font-display)] font-extrabold tracking-[-0.02em] text-[14px] leading-none">
+        // Below about 420px the mark plus the name plus four controls do not
+        // fit, and the name is the part a person can do without: the mark is
+        // still the way home.
+        <span className="hidden min-[420px]:inline font-[family-name:var(--font-display)] font-extrabold tracking-[-0.02em] text-[14px] leading-none">
           Super<span className="text-bone-3">Builds</span>
         </span>
       )}

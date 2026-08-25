@@ -105,12 +105,17 @@ if (await addTab.count()) {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(500);
 
-  // Leave the project as it was found.
-  page.once('dialog', (d) => d.accept());
-  const close = page.locator('button', { hasText: 'Conversation 2' }).first();
+  // Leave the project as it was found. Closing asks first — in the product's
+  // own modal now, not the browser's, so the answer is a button on the page.
+  // The last tab is the one just opened, whatever it got called — closing by
+  // name left a "Conversation 3" behind the second time this ran.
+  const close = page.locator('button[title="Double-click to rename"]').last();
   if (await close.count()) {
     await close.locator('span').last().click().catch(() => {});
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(600);
+    const yes = page.locator('[role="dialog"] button', { hasText: 'Close it' }).first();
+    if (await yes.count()) { await yes.click(); await page.waitForTimeout(1200); }
+    else { console.log('  MISSING: the confirmation for closing a conversation'); failures++; }
   }
 } else { console.log('  MISSING: the new-conversation button'); failures++; }
 

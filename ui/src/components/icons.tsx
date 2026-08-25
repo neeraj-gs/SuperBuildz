@@ -63,6 +63,7 @@ const PATHS: Record<string, string> = {
   glass: 'M7 3h10l2 6-7 12L5 9zM5 9h14',
   exploded: 'M12 4v4M12 16v4M4 12h4M16 12h4M9 9l-2-2M15 9l2-2M9 15l-2 2M15 15l2 2M12 12h.01',
   ribbons: 'M3 8c4-4 6 8 10 4s4-8 8-4M3 16c4-4 6 8 10 4s4-8 8-4',
+  none: 'M4 4h16v16H4zM4 4l16 16',
   check: 'M5 12l5 5L20 7',
   x: 'M6 6l12 12M18 6L6 18',
   arrowRight: 'M5 12h14M13 6l6 6-6 6',

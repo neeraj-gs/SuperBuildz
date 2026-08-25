@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore, connect, navigate } from '@/lib/store';
 import { Toasts, Logo, Button, Dot, cx } from '@/components/ui';
 import { Dialogs } from '@/components/Dialog';
@@ -56,11 +56,26 @@ function TopBar({ overlay }: { overlay: boolean }) {
   const detection = useStore((s) => s.detection);
   const ready = detection?.ok;
 
+  /*
+    The landing page's header floats over its own hero, which only works while
+    there is a hero under it. Past that, display type scrolls up into the
+    wordmark and the two read as one wrong thing. So the bar takes its ground
+    the moment the page moves.
+  */
+  const [moved, setMoved] = useState(false);
+  useEffect(() => {
+    if (!overlay) { setMoved(false); return; }
+    const onScroll = () => setMoved(window.scrollY > 24);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [overlay]);
+
   return (
     <header
       className={cx(
-        'sticky top-0 z-50 h-[52px] shrink-0',
-        overlay ? 'bg-transparent' : 'bg-ink/85 backdrop-blur-xl border-b border-line',
+        'sticky top-0 z-50 h-[52px] shrink-0 transition-colors duration-300',
+        overlay && !moved ? 'bg-transparent' : 'bg-ink/85 backdrop-blur-xl border-b border-line',
       )}
     >
       <div className="h-full bleed flex items-center justify-between gap-4">
@@ -74,8 +89,15 @@ function TopBar({ overlay }: { overlay: boolean }) {
             <span className="hidden sm:inline">Requirements</span>
           </NavLink>
           <NavLink on={route.name === 'projects'} onClick={() => navigate({ name: 'projects' })}>Projects</NavLink>
-          <Button size="sm" icon="refresh" onClick={() => navigate({ name: 'revamp' })} title="Redesign a site you already have">Revamp</Button>
-          <Button variant="primary" size="sm" icon="plus" className="ml-1.5" onClick={() => navigate({ name: 'new' })}>New site</Button>
+          {/* On a narrow screen the four controls were 516px wide on a 390px
+              phone and the last one simply left the building. The words go
+              first; the actions stay. */}
+          <Button size="sm" icon="refresh" onClick={() => navigate({ name: 'revamp' })} title="Redesign a site you already have">
+            <span className="hidden sm:inline">Revamp</span>
+          </Button>
+          <Button variant="primary" size="sm" icon="plus" className="ml-1.5" onClick={() => navigate({ name: 'new' })} title="Build a new site">
+            <span>New<span className="hidden sm:inline"> site</span></span>
+          </Button>
           {!connected && <span className="telemetry text-danger ml-2 hidden md:inline">daemon offline</span>}
         </nav>
       </div>

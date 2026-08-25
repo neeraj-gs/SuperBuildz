@@ -204,6 +204,24 @@ decides what gets built and cannot be read is a document nobody can argue with.
 panel — the routes were already covered by `shot.mjs`, and every recent bug has
 been behind a button.
 
+## 5c-ii. Choosing a folder
+
+`daemon/src/picker.ts`. Revamp asked people to paste a path like
+`C:\\Users\\you\\code\\the-site`, which is a thing graphical computers
+have not required anybody to know since about 1994 — and getting it wrong
+reads as "that is not a website I can read", which sounds like a verdict on
+their site rather than a typo.
+
+The browser cannot help: `<input webkitdirectory>` hands back relative paths
+and a synthetic root name, never an absolute one. But the program that needs
+the answer is the daemon, running as the person, on their machine. So Import
+asks the operating system for its own picker — `FolderBrowserDialog` under
+`-STA` on Windows, `choose folder` on macOS, zenity or kdialog otherwise — and
+gets a real path back. When no native dialog can run (no desktop session, a
+locked-down policy) the same answer is available by walking the disk inside the
+window, folders that hold a website listed first and marked. Typing a path
+still works and always will.
+
 ## 5d. Revamping a site that already exists
 
 The second way in. A new build starts from a template and invents a business;
@@ -342,6 +360,45 @@ conversations are doing right now, taken from the message each was last sent.
 The daemon writes the log rather than asking the model to, because a model asked
 to maintain a shared file will do it beautifully for three turns and then stop,
 and nothing will notice.
+
+## 6b. The tool's own front door
+
+The landing page is the product's first argument, and for a while it was the
+product's best counter-example: it told visitors that a hero should be an
+experience, that the canvas should stay alive under the whole page, and that
+rows of identical cards are what "generated" looks like — then put a WebGL
+scene in one corner of the first screen and spent six sections on card grids
+under numbered eyebrows.
+
+**`ui/src/features/landing/Spine.tsx`** is the fix and the idea. One object,
+fixed behind the whole page: a website's parts float apart, draw together into
+a page, split into three directions, rearrange into a dashboard, multiply into
+several projects at once, and settle. Fourteen plates keep their identity
+throughout — the plate that is a headline in the first chapter is a column
+header in the dashboard and the top of the second stack in the parallel one —
+which is what makes it read as one thing moving rather than six things being
+swapped.
+
+Sections register themselves with a chapter name and the driver measures where
+they actually are. Pinning chapters to fractions of the document would mean any
+new paragraph anywhere silently desynchronises the page; measuring elements
+means a section can be moved, cut or added without touching the scene. Each
+chapter also says where the object sits and how loud it is, because some
+sections are read and some are looked at, and nothing is ever read across
+moving geometry.
+
+The sections themselves had to stop *claiming* and start *being*: the four
+presses are a pinned sequence with the actual interface drawn beside each step;
+the thirteen scenes are an index with one specimen; the CRM is a working figure
+with a hover readout and a table twin, drawn to the same chart rules the
+generated dashboard is built to; and the parallel-sessions board plays a fixed
+five-beat script — four conversations, three projects, one queue, one notebook
+writing itself. The index rule survives in exactly one place, the four presses,
+because that is a real sequence where the order is the information.
+
+Under `prefers-reduced-motion` the pinned section becomes four ordinary blocks,
+every ticker holds still, and the scene stops easing and stops following the
+pointer: it is where the scroll says it is and nothing moves on its own.
 
 ## 7. Storage decisions
 

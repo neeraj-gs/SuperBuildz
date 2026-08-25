@@ -29,6 +29,9 @@ which one it protects.
 | Images fetched from a link refuse private and link-local addresses, cap at 20MB, and only write into a staging folder under `~/.superbuilds/uploads` | A URL field that will fetch `169.254.169.254` on request is a server-side request forgery, and it does not stop being one because the server is a laptop. |
 | A custom palette is five six-digit hexes or nothing | They are written into the generated `design.config.ts` as source. Half a palette is also refused: a page with two of the five moved is worse than the one it started from. |
 | Static files served by the daemon come only from `ui/dist` and `~/.superbuilds/{captures,thumbs}` | Nothing else on disk is reachable over HTTP. |
+| The folder picker's two routes are POSTs behind the per-boot token, return directory *names* only, and open no file | Browsing to choose a folder is not a secret operation, but a list of what is on somebody's disk is theirs. The only thing read besides names is whether a `package.json` or `index.html` exists, which is what makes the list useful. `node_modules`, `.git`, build output and dot-folders are skipped, and the listing is capped at 400 entries. |
+| The native picker is spawned with an argument array, never a shell string, and is killed after three minutes with no answer | `execFile` with an array cannot be turned into a command by a path with a quote in it. The PowerShell path is a `-Command` string, so the one value interpolated into it — the starting folder — is escaped as a single-quoted PowerShell literal. A dialog nobody answers must not hold a request open forever. |
+| The path a picker returns is `stat`ed before it is handed to anything that will act on it | The operating system is trusted; a folder that disappeared between the dialog closing and the answer arriving is not. |
 
 ## What it makes
 
