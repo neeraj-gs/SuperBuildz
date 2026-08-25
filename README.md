@@ -32,6 +32,8 @@ For development with reload:
 
 ```sh
 npm run dev          # daemon on 127.0.0.1:7747, UI on 127.0.0.1:5180
+                     # if 5180 is taken it moves, and the daemon is told which port it moved to.
+                     # SUPERBUILDS_PORT and SUPERBUILDS_UI_PORT override both.
 ```
 
 Verification:

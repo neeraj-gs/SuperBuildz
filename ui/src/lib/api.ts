@@ -9,9 +9,33 @@ import type {
 } from '@superbuilds/protocol';
 
 let token = '';
-export function setToken(t: string) { token = t; }
+let arrived: () => void = () => {};
+/** Resolves the moment the socket hands us the token. */
+const hasToken = new Promise<void>((r) => { arrived = r; });
+export function setToken(t: string) { token = t; arrived(); }
+
+/**
+ * Wait for the token, briefly.
+ *
+ * The daemon now requires it on reads of the person's own work, not only on
+ * writes — see `daemon/src/origins.ts`. Nothing here is a race in practice: the
+ * socket delivers the token in the first frame after connect. But a screen that
+ * mounts and fetches in the same tick would otherwise get a 401 on first paint
+ * and show "reload the page" to somebody whose page was fine.
+ *
+ * The wait is bounded so a daemon that is genuinely not there still fails, and
+ * fails as a 401 the interface knows how to explain, rather than hanging.
+ */
+function waitForToken(): Promise<unknown> {
+  if (token) return Promise.resolve();
+  return Promise.race([hasToken, new Promise((r) => setTimeout(r, 6000))]);
+}
+
+/** The routes the daemon answers without a token. Everything else waits for one. */
+const OPEN = /^\/api\/(health|detect|models|catalogue|changes|spec\/|install\/|reference\/available)/;
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  if (!OPEN.test(path)) await waitForToken();
   // No content-type without a body: Fastify answers 400 to an empty JSON body,
   // which turned every bodiless POST (start preview, stop, sign in) into a failure.
   const res = await fetch(path, {

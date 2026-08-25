@@ -6,6 +6,17 @@ import { dirname, resolve } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
+/*
+  Both ports come from the environment, and `scripts/dev.mjs` is what puts them
+  there — it probes for a free interface port and hands the same number to Vite
+  and to the daemon. Started on its own (`npm run dev:ui`) this falls back to
+  the customary pair, and Vite is left free to walk forward if 5180 is busy,
+  because the daemon no longer cares which port the interface is on.
+*/
+const DAEMON = Number(process.env.SUPERBUILDS_PORT ?? 7747);
+const UI = Number(process.env.SUPERBUILDS_UI_PORT ?? 5180);
+const daemonHttp = `http://127.0.0.1:${DAEMON}`;
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -17,12 +28,17 @@ export default defineConfig({
     dedupe: ['react', 'react-dom', 'three', '@react-three/fiber'],
   },
   server: {
+    host: '127.0.0.1',
+    port: UI,
+    // Only pinned when the parent chose the port and told the daemon about it.
+    // On its own, moving is better than refusing to start.
+    strictPort: !!process.env.SUPERBUILDS_UI_PORT,
     proxy: {
-      '/api': { target: 'http://127.0.0.1:7747', changeOrigin: false },
-      '/hooks': { target: 'http://127.0.0.1:7747' },
-      '/captures': { target: 'http://127.0.0.1:7747' },
-      '/thumbs': { target: 'http://127.0.0.1:7747' },
-      '/ws': { target: 'ws://127.0.0.1:7747', ws: true },
+      '/api': { target: daemonHttp, changeOrigin: false },
+      '/hooks': { target: daemonHttp },
+      '/captures': { target: daemonHttp },
+      '/thumbs': { target: daemonHttp },
+      '/ws': { target: `ws://127.0.0.1:${DAEMON}`, ws: true },
     },
     fs: { allow: [resolve(here, '..')] },
   },

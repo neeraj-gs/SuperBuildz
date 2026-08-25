@@ -15,13 +15,14 @@ import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { daemonFetch } from './token.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const base = process.env.SB_BASE ?? 'http://127.0.0.1:5180';
 const out = join(root, 'shots');
 mkdirSync(out, { recursive: true });
 
-const projects = await (await fetch('http://127.0.0.1:7747/api/projects')).json();
+const projects = await daemonFetch('/api/projects');
 const id = process.argv[2] ?? projects[0]?.id;
 if (!id) { console.error('No projects to walk. Build one first.'); process.exit(1); }
 

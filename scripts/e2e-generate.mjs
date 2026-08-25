@@ -5,7 +5,8 @@ const ws = new WebSocket('ws://127.0.0.1:7747/ws', { origin: 'http://127.0.0.1:5
 const token = await new Promise((res) => ws.on('message', (m) => { const ev = JSON.parse(m.toString()); if (ev.type === 'hello') res(ev.token); }));
 const H = { 'content-type': 'application/json', 'x-superbuilds-token': token };
 const post = async (p, b) => { const r = await fetch(base + p, { method: 'POST', headers: H, body: JSON.stringify(b ?? {}) }); const t = await r.text(); if (!r.ok) throw new Error(p + ' ' + r.status + ' ' + t); return JSON.parse(t); };
-const get = async (p) => (await fetch(base + p)).json();
+// Reads are behind the token too now — see `scripts/token.mjs`.
+const get = async (p) => { const r = await fetch(base + p, { headers: { 'x-superbuilds-token': token } }); const t = await r.text(); if (!r.ok) throw new Error(p + ' ' + r.status + ' ' + t); return JSON.parse(t); };
 
 const mode = process.argv[2] ?? 'create';
 if (mode === 'create') {

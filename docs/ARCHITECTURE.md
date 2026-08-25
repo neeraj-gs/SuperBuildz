@@ -400,6 +400,49 @@ Under `prefers-reduced-motion` the pinned section becomes four ordinary blocks,
 every ticker holds still, and the scene stops easing and stops following the
 pointer: it is where the scroll says it is and nothing moves on its own.
 
+## 6c. Ports, and the day one literal broke the product three ways
+
+Worth writing down because the failure was so much larger than the cause, and
+because every symptom pointed away from it.
+
+Somebody started a second project that already had 5180. Vite did what Vite
+does — took 5181 instead, quietly, by design. The daemon's CORS allowlist and
+its socket origin check both named `127.0.0.1:5180` as a literal. What the
+person saw was:
+
+- **"Internal Server Error"** on anything that changed state. `@fastify/cors`
+  was handed an `Error` for a disallowed origin, and Fastify turns that into a
+  500 — so a CORS *decision* was reported as the daemon falling over.
+- **"daemon offline"** in the header, permanently. The socket carries the
+  per-boot token and the socket was being closed on the same rule.
+- **Everything else looking fine.** The project list still loaded, because a
+  browser sends no `Origin` header on a same-origin GET.
+
+Three unrelated-looking symptoms, one line, and nothing on screen connecting any
+of them to a port number. The fix is in three parts, and each is a different
+kind of answer:
+
+1. **The rule stops naming ports.** `daemon/src/origins.ts` allows any loopback
+   origin and answers `(null, false)` rather than an error, so a refusal is a
+   decision and not a 500. Safe because of a `Host` check that refuses DNS
+   rebinding, and because the token now guards reads too — see `SECURITY.md`.
+2. **The ports stop being literals.** `scripts/ports.mjs` finds a free interface
+   port; `scripts/dev.mjs` hands the same number to both children. Neither can
+   be wrong about the other because neither chose. `ui/package.json` no longer
+   carries a port at all, which is where the drift started.
+3. **The interface says what is wrong.** `ui/src/components/Connection.tsx`
+   replaces two red words that were hidden below `md` with a control you can
+   press at any width, carrying the answer from a live `/api/health` probe —
+   and it distinguishes "nothing is answering" from "answering but refusing the
+   socket", which are indistinguishable from inside the page and want completely
+   different sentences. It reconnects on its own, and also the moment a tab
+   becomes visible or the network returns, because a slept laptop has a dead
+   socket and no event to say so.
+
+The daemon also now says which port is taken when it cannot bind, instead of
+exiting with a stack trace about a socket while `dev.mjs` kills Vite alongside
+it.
+
 ## 7. Storage decisions
 
 | What | Where | Why |

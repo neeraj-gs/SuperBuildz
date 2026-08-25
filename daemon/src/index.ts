@@ -40,6 +40,7 @@ import { ceiling, queued, onQueueChange } from './capacity.ts';
 import { memory, setMemory } from './memory.ts';
 import { surveySite } from './survey.ts';
 import { browse, pickFolder } from './picker.ts';
+import { hostAllowed, needsToken, originAllowed } from './origins.ts';
 import { legiblePalette } from './colour.ts';
 import { understandPrompt, UNDERSTAND_SCHEMA, revampPlan } from './revamp.ts';
 import { execPlain } from './binaries.ts';
@@ -49,16 +50,39 @@ const PORT = Number(process.env.SUPERBUILDS_PORT ?? 7747);
 const HOST = '127.0.0.1';
 const TOKEN = randomBytes(24).toString('base64url');
 const DEV = process.env.SUPERBUILDS_DEV === '1';
+// Where Vite is, in development. Chosen by `scripts/dev.mjs` — which probes for
+// a free one and hands the same number to both children — so the two halves
+// cannot disagree about it. Only used to redirect :7747 to the live interface;
+// nothing is authorised by it.
+const UI_PORT = Number(process.env.SUPERBUILDS_UI_PORT ?? 5180);
 
 const app = Fastify({ logger: false, bodyLimit: 4 * 1024 * 1024 });
 
+/*
+  Any loopback origin, on any port. See `origins.ts` for why it is not a list
+  of port numbers any more, and for the two things that make it safe.
+
+  The callback answers `(null, false)` and never `(error, …)`. Handing
+  @fastify/cors an Error makes Fastify answer 500 "Internal Server Error",
+  which is how a refused origin came to look like the daemon falling over. A
+  disallowed origin is a decision, not a fault: the response is sent without
+  the header and the browser is the one that stops it.
+*/
 await app.register(cors, {
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
-    const ok = [`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`, 'http://127.0.0.1:5180', 'http://localhost:5180'].includes(origin);
-    cb(ok ? null : new Error('origin not allowed'), ok);
-  },
+  origin: (origin, cb) => cb(null, originAllowed(origin)),
   credentials: false,
+});
+
+/*
+  DNS rebinding. A page on the internet can point a name it controls at
+  127.0.0.1 and then talk to this daemon as same-origin — no CORS involved,
+  because as far as the browser is concerned there is no crossing. What it
+  cannot forge is the `Host` header, which carries the name it used.
+*/
+app.addHook('onRequest', async (req, reply) => {
+  if (!hostAllowed(req.headers.host)) {
+    return reply.code(403).send({ error: 'This daemon answers on 127.0.0.1 only.' });
+  }
 });
 
 // Static: the built UI, captures and thumbnails. Nothing else on disk is reachable.
@@ -70,7 +94,7 @@ if (DEV) {
   // In development the interface is served by Vite with reload; the built
   // `ui/dist` here is whatever `npm run build` last produced, which is a trap
   // — you edit a screen, reload :7747, and see the old one. So don't serve it.
-  const VITE = 'http://127.0.0.1:5180';
+  const VITE = `http://127.0.0.1:${UI_PORT}`;
   app.setNotFoundHandler((req, reply) => {
     if (req.url.startsWith('/api') || req.url.startsWith('/hooks')) return reply.code(404).send({ error: 'not found' });
     return reply.code(302).redirect(VITE + req.url);
@@ -91,13 +115,19 @@ if (DEV) {
   });
 }
 
-/** Mutating routes need the token. Read-only routes do not: the UI loads before it has one. */
+/**
+ * The token guards everything that changes state *and* everything that returns
+ * the person's own work — see `needsToken`. Health, the catalogue and what is
+ * installed stay open, because the interface reads them before the socket has
+ * handed it a token and none of them are anybody's.
+ */
 function guarded(req: { headers: Record<string, unknown> }): boolean {
   return req.headers['x-superbuilds-token'] === TOKEN;
 }
 app.addHook('onRequest', async (req, reply) => {
-  if (req.method === 'GET' || req.method === 'OPTIONS') return;
-  if (req.url.startsWith('/api/') && !guarded(req as never)) return reply.code(401).send({ error: 'missing or wrong token — reload the page' });
+  if (needsToken(req.method, req.url) && !guarded(req as never)) {
+    return reply.code(401).send({ error: 'missing or wrong token — reload the page' });
+  }
 });
 
 /* Health, requirements */
@@ -585,7 +615,30 @@ app.post('/hooks/notification', async (req, reply) => { if (req.headers['x-super
 
 /* Socket */
 
-await app.listen({ port: PORT, host: HOST });
+/*
+  Bind, or say plainly what is on the port.
+
+  An unhandled EADDRINUSE here exits with a stack trace about a socket, and
+  `scripts/dev.mjs` then kills Vite too — so the whole thing dies with no
+  sentence anywhere saying "something else is already on 7747".
+*/
+try {
+  await app.listen({ port: PORT, host: HOST });
+} catch (e) {
+  const err = e as NodeJS.ErrnoException;
+  if (err.code === 'EADDRINUSE') {
+    console.error(`
+Port ${PORT} is already taken — probably a Super Builds daemon that is still running.`);
+    console.error('Close that one, or start this one on another port:');
+    console.error(`  SUPERBUILDS_PORT=${PORT + 1} npm run dev
+`);
+  } else {
+    console.error(`
+The daemon could not start on ${HOST}:${PORT}: ${err.message}
+`);
+  }
+  process.exit(1);
+}
 configureHooks(PORT, TOKEN);
 // Anything joining or leaving the queue is news: it is the only explanation a
 // person has for a conversation that has not started yet.
@@ -593,8 +646,9 @@ onQueueChange(() => broadcast({ type: 'capacity.update', capacity: capacityNow()
 
 const wss = new WebSocketServer({ server: app.server, path: '/ws' });
 wss.on('connection', (ws, req) => {
-  const origin = String(req.headers.origin ?? '');
-  if (origin && ![`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`, 'http://127.0.0.1:5180', 'http://localhost:5180'].includes(origin)) { ws.close(); return; }
+  // Same rule as the API, and for the same reason: a socket refused on a port
+  // number is a product that says "daemon offline" and cannot say why.
+  if (!originAllowed(req.headers.origin) || !hostAllowed(req.headers.host)) { ws.close(); return; }
   addClient(ws);
   send(ws, { type: 'hello', token: TOKEN });
   for (const p of listProjects()) send(ws, { type: 'project.upsert', project: p });
@@ -604,7 +658,7 @@ wss.on('connection', (ws, req) => {
   ws.on('error', () => removeClient(ws));
 });
 
-console.log(`Super Builds daemon on http://${HOST}:${PORT}${DEV ? " (dev — open the interface at http://127.0.0.1:5180)" : ""}`);
+console.log(`Super Builds daemon on http://${HOST}:${PORT}${DEV ? ` (dev — open the interface at http://127.0.0.1:${UI_PORT})` : ''}`);
 
 const shutdown = async () => {
   closeAll();
