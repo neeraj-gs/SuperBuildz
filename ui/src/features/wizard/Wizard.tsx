@@ -30,7 +30,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Catalogue, CustomPalette, Plan, Spec } from '@superbuilds/protocol';
 import { api, type Question } from '@/lib/api';
-import { useStore, navigate, toast } from '@/lib/store';
+import { useStore, navigate, toast, ask } from '@/lib/store';
 import { Button, Chip, Index, Input, Spinner, Textarea, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { ChipMany, PickMany, PickOne, PickSwatch } from './Pickers';
@@ -38,6 +38,7 @@ import { LivePreview } from './LivePreview';
 import { ReferenceStep } from './ReferenceStep';
 import { PicturesStep } from './PicturesStep';
 import { CustomPaletteEditor } from './CustomPalette';
+import { FolderField } from '@/components/FolderPicker';
 
 const STEPS = [
   { id: 'reference', title: 'A site you admire', lede: 'Optional, and the most useful thing you can do here. It will be looked at, recorded and understood — then you choose which parts to carry across, and everything after this opens already answered.', short: 'Reference' },
@@ -166,6 +167,21 @@ export function Wizard() {
     }
   };
 
+  const discard = async () => {
+    const yes = await ask({
+      title: 'Throw this draft away?',
+      body: 'Every answer on all eighteen screens goes.',
+      points: ['nothing has been created on disk yet, so there is nothing else to undo'],
+      confirmLabel: 'Throw it away',
+      cancelLabel: 'Keep it',
+      icon: 'trash',
+      danger: true,
+    });
+    if (!yes) return;
+    localStorage.removeItem(DRAFT);
+    navigate({ name: 'projects' });
+  };
+
   const goTo = (i: number) => { if (reachable(i)) { setAt(i); setShowJump(false); window.scrollTo({ top: 0, behavior: 'smooth' }); } };
   const canNext = step.id !== 'what' || !!spec.archetype;
   const next = () => goTo(Math.min(STEPS.length - 1, at + 1));
@@ -226,7 +242,7 @@ export function Wizard() {
         </div>
         <div className="flex items-center gap-2">
           {saved.current && at > 0 && <span className="telemetry text-bone-3 hidden md:inline">draft restored</span>}
-          <Button size="sm" variant="quiet" icon="x" onClick={() => { if (confirm('Throw this draft away?')) { localStorage.removeItem(DRAFT); navigate({ name: 'projects' }); } }}>Discard</Button>
+          <Button size="sm" variant="quiet" icon="x" onClick={discard}>Discard</Button>
         </div>
       </div>
 
@@ -538,9 +554,13 @@ function GoStep({ spec, plan, showBrief, setShowBrief, setSpec, folderNote, ques
     <div className="space-y-6">
       <div className="grid sm:grid-cols-2 gap-4">
         <Labelled label="Name"><Input value={spec.name} onChange={(e) => setSpec((s) => ({ ...s, name: e.target.value }))} placeholder="Required" /></Labelled>
-        <Labelled label={revamping ? 'Folder \u2014 the site you already have' : 'Folder'}>
-          <Input value={spec.folder} readOnly={revamping} onChange={(e) => setSpec((s) => ({ ...s, folder: e.target.value }))} />
-        </Labelled>
+        {revamping ? (
+          <Labelled label={'Folder — the site you already have'}>
+            <Input value={spec.folder} readOnly className="font-[family-name:var(--font-mono)] !text-[13px]" />
+          </Labelled>
+        ) : (
+          <FolderField label="Folder" value={spec.folder} onChange={(v) => setSpec((s) => ({ ...s, folder: v }))} />
+        )}
       </div>
       {!revamping && folderNote && <p className="text-[13px] text-danger -mt-3">{folderNote}</p>}
 

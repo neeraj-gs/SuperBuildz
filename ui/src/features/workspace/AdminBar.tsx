@@ -14,7 +14,7 @@
 import { useEffect, useState } from 'react';
 import type { AdminLogin } from '@superbuilds/protocol';
 import { api } from '@/lib/api';
-import { toast } from '@/lib/store';
+import { toast, ask } from '@/lib/store';
 import { Button, Input, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
@@ -46,7 +46,14 @@ export function AdminBar({ projectId, url }: { projectId: string; url?: string }
   };
 
   const forget = async () => {
-    if (!confirm('Forget the password? The CRM keeps working, but Super Builds will not be able to remind you what it is — only set you a new one.')) return;
+    const yes = await ask({
+      title: 'Forget the password?',
+      body: 'The CRM keeps working and your login does not change.',
+      points: ['the reminder above disappears from this machine', 'Super Builds can set you a new one, but never show you this one again'],
+      confirmLabel: 'Forget it',
+      icon: 'lock',
+    });
+    if (!yes) return;
     try { setLogin(await api.forgetAdminPassword(projectId)); setShow(false); toast('Forgotten. The hash is still there, so your login still works.', 'ok'); }
     catch (e) { toast((e as Error).message, 'error'); }
   };

@@ -1,7 +1,7 @@
 /** Every site this machine has made, and the button for the next one. */
 
 import { useEffect, useMemo, useState } from 'react';
-import { useStore, navigate, toast } from '@/lib/store';
+import { useStore, navigate, toast, ask } from '@/lib/store';
 import { api } from '@/lib/api';
 import { Button, Empty, Index, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
@@ -167,7 +167,15 @@ function Row({ p, gen }: { p: Project; gen?: { stages: Array<{ status: string }>
 }
 
 async function forget(p: Project) {
-  if (!confirm(`Forget "${p.name}"? The folder stays on disk.`)) return;
+  const yes = await ask({
+    title: `Forget ${p.name}?`,
+    body: 'It disappears from this list only.',
+    points: [p.path, 'the folder and everything in it stays exactly where it is'],
+    confirmLabel: 'Forget it',
+    danger: true,
+    icon: 'trash',
+  });
+  if (!yes) return;
   try { await api.deleteProject(p.id); toast('Forgotten. The folder is still there.', 'ok'); }
   catch (e) { toast((e as Error).message, 'error'); }
 }

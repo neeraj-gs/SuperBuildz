@@ -23,6 +23,7 @@ import type { SiteSurvey, Spec, Understanding } from '@superbuilds/protocol';
 import { api } from '@/lib/api';
 import { useStore, navigate, toast } from '@/lib/store';
 import { Button, Index, Input, Spinner, cx } from '@/components/ui';
+import { FolderField } from '@/components/FolderPicker';
 import { Icon } from '@/components/icons';
 
 /** The wizard reads this on mount; writing it is the hand-off. */
@@ -40,9 +41,10 @@ export function Revamp() {
   const capture = captureId ? captures[captureId] : undefined;
   const readingRef = useRef(false);
 
-  const look = async () => {
-    const p = path.trim();
+  const look = async (which?: string) => {
+    const p = (which ?? path).trim();
     if (!p) return;
+    if (which && which !== path) setPath(which);
     setSurveying(true); setUnderstanding(null); setSurvey(null);
     try {
       const s = await api.survey(p);
@@ -136,23 +138,20 @@ export function Revamp() {
       </p>
 
       <div className="panel p-5 mt-8 grid gap-4">
-        <label className="block">
-          <span className="legend block mb-1.5">The folder the site lives in</span>
-          <Input
-            placeholder="C:\Users\you\code\the-restaurant"
-            value={path}
-            onChange={(e) => setPath(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void look(); }}
-            autoFocus
-          />
-        </label>
+        <FolderField
+          label="The folder the site lives in"
+          value={path}
+          onChange={setPath}
+          onCommit={(p) => { if (p.trim()) void look(p); }}
+          autoFocus
+        />
         <label className="block">
           <span className="legend block mb-1.5">Its live address (optional)</span>
           <Input placeholder="https://the-restaurant.com" value={url} onChange={(e) => setUrl(e.target.value)} />
           <span className="block telemetry text-bone-4 mt-1.5">If you give it, the site is photographed while scrolling and the pictures are read too.</span>
         </label>
         <div className="flex items-center gap-3">
-          <Button variant="primary" icon="search" busy={surveying} disabled={!path.trim()} onClick={look}>Look at it</Button>
+          <Button variant="primary" icon="search" busy={surveying} disabled={!path.trim()} onClick={() => void look()}>Look at it</Button>
           <span className="text-[13px] text-bone-3">Nothing is changed. This only reads.</span>
         </div>
       </div>

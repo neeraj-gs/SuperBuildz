@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FileBody, FileEntry } from '@superbuilds/protocol';
 import { api } from '@/lib/api';
-import { toast } from '@/lib/store';
+import { toast, ask } from '@/lib/store';
 import { Button, Input, Spinner, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { highlight, iconForFile } from './highlight';
@@ -83,7 +83,15 @@ export function Files({ projectId, onClose, startAt }: { projectId: string; onCl
 
   const revert = async () => {
     if (!tab) return;
-    if (!confirm(`Put ${tab.path} back the way the last commit had it? Anything unsaved here goes too.`)) return;
+    const yes = await ask({
+      title: `Put ${tab.path} back?`,
+      body: 'It returns to exactly what the last commit has.',
+      points: ['anything unsaved in this tab goes too', 'other files are untouched'],
+      confirmLabel: 'Revert the file',
+      icon: 'undo',
+      danger: true,
+    });
+    if (!yes) return;
     try {
       const r = await api.revertFile(projectId, tab.path);
       toast(r.message, r.ok ? 'ok' : 'error');
@@ -91,9 +99,18 @@ export function Files({ projectId, onClose, startAt }: { projectId: string; onCl
     } catch (e) { toast((e as Error).message, 'error'); }
   };
 
-  const close = (path: string) => {
+  const close = async (path: string) => {
     const t = tabs.find((x) => x.path === path);
-    if (t && t.draft !== t.body.text && !confirm(`${path} has unsaved changes. Close it anyway?`)) return;
+    if (t && t.draft !== t.body.text) {
+      const yes = await ask({
+        title: `${path} has unsaved changes.`,
+        body: 'Closing the tab throws away what you typed.',
+        confirmLabel: 'Close anyway',
+        cancelLabel: 'Keep editing',
+        danger: true,
+      });
+      if (!yes) return;
+    }
     setTabs((all) => all.filter((x) => x.path !== path));
     if (active === path) setActive(tabs.filter((x) => x.path !== path).at(-1)?.path ?? '');
   };

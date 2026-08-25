@@ -28,7 +28,7 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@superbuilds/protocol';
 import { api } from '@/lib/api';
-import { useStore, toast } from '@/lib/store';
+import { useStore, toast, ask, askText } from '@/lib/store';
 import { Button, Spinner, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
@@ -69,14 +69,27 @@ export function SessionTabs({ projectId, activeId, onPick, onNotes }: {
   };
 
   const rename = async (s: Session) => {
-    const title = prompt('Call this conversation what?', s.title)?.trim();
+    const title = (await askText({
+      title: 'Call this conversation what?',
+      body: 'Only a label. It appears on the tab and in the shared notes, so the other conversations know what this one has been doing.',
+      input: { label: 'Name', value: s.title, placeholder: 'The menu page' },
+      confirmLabel: 'Rename',
+    }))?.trim();
     if (!title || title === s.title) return;
     try { useStore.getState().apply({ type: 'session.upsert', session: await api.renameSession(s.id, title) }); }
     catch (e) { toast((e as Error).message, 'error'); }
   };
 
   const close = async (s: Session) => {
-    if (!confirm(`Close “${s.title}”? The transcript goes; everything it built stays, and it is all in git.`)) return;
+    const yes = await ask({
+      title: `Close “${s.title}”?`,
+      body: 'The conversation goes. What it built does not.',
+      points: ['every file it changed stays exactly as it is', 'all of it is in git, so nothing is lost either way', 'the other conversations are unaffected'],
+      confirmLabel: 'Close it',
+      icon: 'x',
+      danger: true,
+    });
+    if (!yes) return;
     try {
       await api.deleteSession(s.id);
       setIds((prev) => prev.filter((id) => id !== s.id));

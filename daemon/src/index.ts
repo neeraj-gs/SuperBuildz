@@ -39,6 +39,7 @@ import { engineInfo, setBrief } from './engine.ts';
 import { ceiling, queued, onQueueChange } from './capacity.ts';
 import { memory, setMemory } from './memory.ts';
 import { surveySite } from './survey.ts';
+import { browse, pickFolder } from './picker.ts';
 import { understandPrompt, UNDERSTAND_SCHEMA, revampPlan } from './revamp.ts';
 import { execPlain } from './binaries.ts';
 import { superbuildsHome, uiDist } from './paths.ts';
@@ -124,6 +125,17 @@ app.get('/api/changes', async () => CHANGES);
 app.get('/api/spec/defaults', async (req) => defaultsFor(String((req.query as { archetype?: string }).archetype ?? 'other')));
 app.get('/api/folder/suggest', async (req) => ({ folder: folderFor(String((req.query as { name?: string }).name ?? 'site')) }));
 app.post('/api/folder/check', async (req) => folderIsUsable(String((req.body as { path?: string })?.path ?? '')));
+
+/*
+  Choosing a folder.
+
+  Both are POSTs so they sit behind the token guard, even though `browse` only
+  reads directory names: a list of what is on somebody's disk is not secret,
+  but it is theirs, and there is no reason for it to be the one route that
+  answers anybody who finds the port.
+*/
+app.post('/api/folder/pick', async (req) => pickFolder(String((req.body as { start?: string })?.start ?? '') || undefined));
+app.post('/api/folder/browse', async (req) => browse(String((req.body as { path?: string })?.path ?? '') || undefined));
 // A folder of photographs is not a project folder: it exists, it is not empty,
 // and what matters is what is in it.
 app.post('/api/media/check', async (req) => checkMediaFolder(String((req.body as { path?: string })?.path ?? '')));

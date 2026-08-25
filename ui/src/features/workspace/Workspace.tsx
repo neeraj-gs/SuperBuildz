@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useStore, navigate, toast } from '@/lib/store';
+import { useStore, navigate, toast, ask, askText } from '@/lib/store';
 import { api } from '@/lib/api';
 import { Button, Logo, Spinner, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
@@ -114,13 +114,26 @@ export function Workspace({ id }: { id: string }) {
     catch (e) { toast((e as Error).message, 'error'); } finally { setShooting(false); }
   };
   const rename = async () => {
-    const name = prompt('Call it what?', project.name)?.trim();
+    const name = (await askText({
+      title: 'Call it what?',
+      body: 'The name in Super Builds. The folder on disk and the site itself keep their own names.',
+      input: { label: 'Name', value: project.name },
+      confirmLabel: 'Rename',
+    }))?.trim();
     if (!name || name === project.name) return;
     try { const p = await api.patchProject(id, { name }); useStore.getState().apply({ type: 'project.upsert', project: p }); }
     catch (e) { toast((e as Error).message, 'error'); }
   };
   const remove = async () => {
-    if (!confirm(`Delete ${project.name} from Super Builds? The folder on your machine stays exactly where it is.`)) return;
+    const yes = await ask({
+      title: `Remove ${project.name} from Super Builds?`,
+      body: 'It disappears from the projects list, and nothing else happens.',
+      points: [project.path, 'the folder, the git history and any deployment all stay', 'you can add it back by pointing Revamp at the same folder'],
+      confirmLabel: 'Remove it',
+      icon: 'trash',
+      danger: true,
+    });
+    if (!yes) return;
     try { await api.deleteProject(id); navigate({ name: 'projects' }); } catch (e) { toast((e as Error).message, 'error'); }
   };
 

@@ -40,6 +40,31 @@ export function pathFor(r: Route): string {
 
 export interface Toast { id: number; text: string; kind: 'info' | 'error' | 'ok' }
 
+/**
+ * A question the interface asks and waits for.
+ *
+ * `window.confirm` was doing this job, and it is the one piece of the product
+ * nobody designed: it says "127.0.0.1:5180 says", it cannot show what will
+ * happen, it cannot be styled, and on a page about how a site should look it
+ * is the loudest possible admission that this part was not thought about. It
+ * also blocks the whole tab, which matters here — several conversations may be
+ * mid-turn behind it.
+ */
+export interface Ask {
+  id: number;
+  title: string;
+  body?: string;
+  /** Extra lines under the body, each a fact about what is about to happen. */
+  points?: string[];
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+  icon?: string;
+  /** Present when the answer is a line of text rather than yes or no. */
+  input?: { label?: string; placeholder?: string; value?: string };
+  resolve: (v: string | boolean | null) => void;
+}
+
 interface State {
   route: Route;
   connected: boolean;
@@ -59,9 +84,11 @@ interface State {
   analytics: Record<string, AnalyticsState>;
   capacity?: Capacity;
   toasts: Toast[];
+  dialogs: Ask[];
   navigate: (r: Route) => void;
   toast: (text: string, kind?: Toast['kind']) => void;
   dismissToast: (id: number) => void;
+  answer: (id: number, value: string | boolean | null) => void;
   loadCatalogue: () => Promise<Catalogue>;
   loadDetection: () => Promise<Detection>;
   loadProjects: () => Promise<void>;
@@ -86,6 +113,7 @@ export const useStore = create<State>((set, get) => ({
   tweaks: {},
   analytics: {},
   toasts: [],
+  dialogs: [],
 
   navigate: (r) => {
     const path = pathFor(r);
@@ -99,6 +127,11 @@ export const useStore = create<State>((set, get) => ({
     setTimeout(() => get().dismissToast(id), kind === 'error' ? 8000 : 4200);
   },
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  answer: (id, value) => {
+    const d = get().dialogs.find((x) => x.id === id);
+    set((s) => ({ dialogs: s.dialogs.filter((x) => x.id !== id) }));
+    d?.resolve(value);
+  },
 
   loadCatalogue: async () => { const c = get().catalogue ?? await api.catalogue(); set({ catalogue: c }); return c; },
   loadDetection: async () => { const d = await api.detect(); set({ detection: d }); return d; },
@@ -166,3 +199,22 @@ window.addEventListener('popstate', () => useStore.setState({ route: parseRoute(
 
 export const navigate = (r: Route) => useStore.getState().navigate(r);
 export const toast = (text: string, kind?: Toast['kind']) => useStore.getState().toast(text, kind);
+
+let askSeq = 1;
+function open(a: Omit<Ask, 'id' | 'resolve'>): Promise<string | boolean | null> {
+  return new Promise((resolve) => {
+    const id = askSeq++;
+    useStore.setState((s) => ({ dialogs: [...s.dialogs, { ...a, id, resolve }] }));
+  });
+}
+
+/** Yes or no, with the consequence spelled out. Resolves false if dismissed. */
+export async function ask(a: Omit<Ask, 'id' | 'resolve' | 'input'>): Promise<boolean> {
+  return (await open(a)) === true;
+}
+
+/** One line of text, or null if dismissed. */
+export async function askText(a: Omit<Ask, 'id' | 'resolve'> & { input: NonNullable<Ask['input']> }): Promise<string | null> {
+  const v = await open(a);
+  return typeof v === 'string' ? v : null;
+}

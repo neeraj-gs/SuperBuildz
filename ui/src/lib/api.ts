@@ -36,6 +36,9 @@ const del = <T,>(p: string) => call<T>('DELETE', p);
 
 export interface Question { id: string; question: string; why?: string; options: Array<{ label: string; hint?: string }>; multi?: boolean }
 
+export interface FolderEntry { name: string; path: string; site?: boolean }
+export interface FolderListing { ok: boolean; path: string; up?: string; entries: FolderEntry[]; places: FolderEntry[]; reason?: string; truncated?: boolean }
+
 export const api = {
   health: () => get<{ ok: boolean }>('/api/health'),
   detect: () => get<Detection>('/api/detect'),
@@ -50,6 +53,8 @@ export const api = {
   defaults: (archetype: string) => get<Omit<Spec, 'name' | 'folder'>>(`/api/spec/defaults?archetype=${encodeURIComponent(archetype)}`),
   suggestFolder: (name: string) => get<{ folder: string }>(`/api/folder/suggest?name=${encodeURIComponent(name)}`),
   checkFolder: (path: string) => post<{ ok: boolean; reason?: string }>('/api/folder/check', { path }),
+  pickFolder: (start?: string) => post<{ ok: boolean; path?: string; reason?: string }>('/api/folder/pick', { start }),
+  browseFolder: (path?: string) => post<FolderListing>('/api/folder/browse', { path }),
   checkMedia: (path: string) => post<{ ok: boolean; count: number; sample: string[]; totalBytes: number; reason?: string }>('/api/media/check', { path }),
   mediaFolder: () => post<{ folder: string }>('/api/media/folder'),
   mediaList: (folder: string) => get<{ files: Array<{ name: string; size: number }> }>(`/api/media/list?folder=${encodeURIComponent(folder)}`),

@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Session, Turn, ToolCall, Choice } from '@superbuilds/protocol';
 import { api } from '@/lib/api';
-import { useStore, toast } from '@/lib/store';
+import { useStore, toast, ask } from '@/lib/store';
 import { Button, Markdown, Spinner, Textarea, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
@@ -34,7 +34,15 @@ export function Chat({ session, projectId, busy }: { session: Session; projectId
   };
   const stop = async () => { try { await api.stop(session.id); } catch (e) { toast((e as Error).message, 'error'); } };
   const undo = async (turnId: string) => {
-    if (!confirm('Put the site back to before this message? Everything after it is undone.')) return;
+    const yes = await ask({
+      title: 'Put the site back to before this message?',
+      body: 'Every change made after it is undone.',
+      points: ['the files return to the checkpoint taken before that turn', 'the conversation above it stays', 'it is a git commit, so this itself can be undone'],
+      confirmLabel: 'Rewind',
+      icon: 'undo',
+      danger: true,
+    });
+    if (!yes) return;
     try { const r = await api.rewind(session.id, turnId); toast(r.message, r.ok ? 'ok' : 'error'); await useStore.getState().loadSession(session.id); } catch (e) { toast((e as Error).message, 'error'); }
   };
   const runChange = async () => {

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useStore, connect, navigate } from '@/lib/store';
 import { Toasts, Logo, Button, Dot, cx } from '@/components/ui';
+import { Dialogs } from '@/components/Dialog';
 import { Landing } from '@/features/landing/Landing';
 import { Setup } from '@/features/setup/Setup';
 import { Dashboard } from '@/features/dashboard/Dashboard';
@@ -28,7 +29,7 @@ export function App() {
 
   // The workspace owns its whole viewport: its own header, its own scroll.
   if (route.name === 'project') {
-    return (<><Workspace id={route.id} /><Toasts /></>);
+    return (<><Workspace id={route.id} /><Toasts /><Dialogs /></>);
   }
 
   const overlay = route.name === 'landing';
@@ -44,6 +45,7 @@ export function App() {
         {route.name === 'revamp' && <Revamp />}
       </main>
       <Toasts />
+      <Dialogs />
     </div>
   );
 }
