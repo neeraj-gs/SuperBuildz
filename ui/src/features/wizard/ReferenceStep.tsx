@@ -20,50 +20,68 @@
  * adopted until a switch is pressed. That is the difference between "here is a
  * site that looks like theirs" — which is theft and also boring — and "I liked
  * the way that one moved, and nothing else about it".
+ *
+ * ── Why the captures are not this component's state any more ────────────────
+ *
+ * They used to be, and so pressing Next and then Back threw the whole reading
+ * away: the component unmounted, its list of capture ids went with it, and the
+ * effect that syncs finished captures into the draft then dutifully wrote back
+ * "no references, no DNA". Losing a two-minute reading by looking at the next
+ * screen is the kind of bug that makes somebody stop trusting the tool. The
+ * ids now live in the draft beside everything else that survives, and are
+ * re-fetched on mount; when even the daemon has forgotten a capture — a
+ * restart, days later — what was extracted is still in the draft, and that is
+ * what gets shown.
  */
 
 import { useEffect, useState } from 'react';
-import type { Catalogue, DesignDNA, DnaPart, Spec } from '@superbuilds/protocol';
+import type { Catalogue, DesignDNA, DnaPart, ReferenceCapture, Spec } from '@superbuilds/protocol';
 import { api } from '@/lib/api';
 import { useStore, toast } from '@/lib/store';
 import { Button, Input, Spinner, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
+import { PARTS, describes, hostOf, togglePart } from './dna';
 
-/** What can be taken, what it sets, and how to say it in one line. */
-const PARTS: Array<{ id: DnaPart; label: string; icon: string; blurb: string }> = [
-  { id: 'palette', label: 'Its colours', icon: 'palette', blurb: 'The five it actually uses, sampled — yours to drag afterwards' },
-  { id: 'typography', label: 'Its typography', icon: 'type', blurb: 'The nearest pairing in the catalogue, not the same fonts' },
-  { id: 'atmosphere', label: 'How it feels', icon: 'sparkle', blurb: 'The mood, which decides far more than the colours do' },
-  { id: 'layout', label: 'How it is organised', icon: 'layout', blurb: 'The grid and the rhythm of the page' },
-  { id: 'scene', label: 'Its 3D', icon: 'cube', blurb: 'The kind of scene, adapted to your business' },
-  { id: 'motion', label: 'How it moves', icon: 'mouse', blurb: 'Intensity, scroll, hover, cursor and transitions together' },
-  { id: 'signature', label: 'Its one memorable move', icon: 'bolt', blurb: 'The thing you would describe to somebody afterwards' },
-];
+/** A reference as the screen needs it: live if the daemon still has it, remembered if not. */
+interface Ref { url: string; dna?: DesignDNA; capture?: ReferenceCapture }
 
-export function ReferenceStep({ spec, setSpec, catalogue }: {
+export function ReferenceStep({ spec, setSpec, catalogue, captureIds, setCaptureIds }: {
   spec: Partial<Spec>;
   setSpec: React.Dispatch<React.SetStateAction<Partial<Spec> & { name: string; folder: string }>>;
   catalogue: Catalogue;
+  captureIds: string[];
+  setCaptureIds: (ids: string[]) => void;
 }) {
   const [url, setUrl] = useState('');
-  const [captureIds, setCaptureIds] = useState<string[]>([]);
   const [avail, setAvail] = useState<{ ok: boolean; reason?: string } | null>(null);
   const captures = useStore((s) => s.captures);
-  const urls = spec.references ?? [];
-  const dnas = spec.dna ?? [];
 
   useEffect(() => { void api.referenceAvailable().then(setAvail).catch(() => setAvail({ ok: false, reason: 'The daemon did not answer.' })); }, []);
 
-  // A finished capture folds its DNA into the spec. Nothing is *adopted* here —
-  // the DNA travels into the brief as context regardless, and the switches
-  // below decide what actually pre-selects a screen.
+  // Coming back to this screen: ask the daemon for each capture again, so the
+  // pictures and the video are there rather than a blank card. A capture it no
+  // longer has is not an error — the draft still holds what was extracted.
   useEffect(() => {
-    const done = captureIds.map((id) => captures[id]).filter((c) => c?.status === 'done' && c.dna);
-    const nextDna = done.map((c) => c!.dna!);
-    const nextUrls = done.map((c) => c!.url);
-    if (nextDna.length !== dnas.length || nextUrls.some((u, i) => urls[i] !== u)) {
-      setSpec((s) => ({ ...s, references: nextUrls, dna: nextDna }));
+    for (const id of captureIds) {
+      if (captures[id]) continue;
+      api.captureState(id).then((c) => useStore.getState().apply({ type: 'reference.update', capture: c })).catch(() => {});
     }
+  }, [captureIds]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /*
+    Finished captures fold their DNA into the draft.
+
+    Only ever additive while a capture is missing: the previous version
+    recomputed the whole list from whatever was in memory, which is how
+    pressing Next and Back erased a reading the daemon had already done.
+  */
+  useEffect(() => {
+    const done = captureIds.map((id) => captures[id]).filter((c): c is ReferenceCapture => c?.status === 'done' && !!c.dna);
+    if (!done.length) return;
+    const urls = done.map((c) => c.url);
+    const dnas = done.map((c) => c.dna!);
+    const same = urls.length === (spec.references?.length ?? 0) && urls.every((u, i) => spec.references?.[i] === u);
+    if (!same) setSpec((s) => ({ ...s, references: urls, dna: dnas }));
   }, [captures, captureIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const start = async () => {
@@ -71,49 +89,32 @@ export function ReferenceStep({ spec, setSpec, catalogue }: {
     if (!u) return;
     try {
       const cap = await api.capture(/^https?:\/\//i.test(u) ? u : `https://${u}`);
-      setCaptureIds((ids) => [...ids, cap.id].slice(-3));
+      setCaptureIds([...captureIds, cap.id].slice(-3));
       setUrl('');
     } catch (e) { toast((e as Error).message, 'error'); }
   };
 
-  const adopted = new Set(spec.adopted ?? []);
-
-  /**
-   * Applying a part writes real spec fields, so the screen it belongs to opens
-   * with the answer already chosen and a note saying where it came from.
-   */
-  const toggle = (dna: DesignDNA, part: DnaPart) => {
-    const on = adopted.has(part);
-    const sug = dna.suggests ?? {};
+  const forget = (r: Ref, id?: string) => {
+    if (id) setCaptureIds(captureIds.filter((x) => x !== id));
     setSpec((s) => {
-      const next = { ...s };
-      const list = new Set(s.adopted ?? []);
-      if (on) list.delete(part); else list.add(part);
-      next.adopted = [...list];
-
-      if (part === 'palette') {
-        if (on) next.customPalette = undefined;
-        else { next.customPalette = dna.customPalette; if (sug.palette) next.palette = sug.palette; }
-      }
-      if (part === 'typography' && sug.typography) next.typography = on ? s.typography : sug.typography;
-      if (part === 'atmosphere' && sug.atmosphere) next.atmosphere = on ? s.atmosphere : sug.atmosphere;
-      if (part === 'layout' && sug.layout) next.layout = on ? s.layout : sug.layout;
-      if (part === 'scene' && sug.scene) next.scene = on ? s.scene : sug.scene;
-      if (part === 'motion' && !on) {
-        if (sug.motionIntensity) next.motionIntensity = sug.motionIntensity;
-        if (sug.scrollStyle) next.scrollStyle = sug.scrollStyle;
-        if (sug.hoverStyle) next.hoverStyle = sug.hoverStyle;
-        if (sug.cursorStyle) next.cursorStyle = sug.cursorStyle;
-        if (sug.transition) next.transition = sug.transition;
-      }
-      if (part === 'signature') next.signature = on ? undefined : sug.signature;
-      return next;
+      const keep = (s.references ?? []).map((u, i) => ({ u, d: s.dna?.[i] })).filter((x) => x.u !== r.url);
+      return { ...s, references: keep.map((x) => x.u), dna: keep.map((x) => x.d).filter(Boolean) as DesignDNA[] };
     });
   };
 
+  // Live captures first, then anything the draft remembers that they do not cover.
+  const live: Array<Ref & { id: string }> = captureIds.map((id) => ({ id, url: captures[id]?.url ?? '', dna: captures[id]?.dna, capture: captures[id] }));
+  const remembered: Ref[] = (spec.references ?? [])
+    .map((u, i) => ({ url: u, dna: spec.dna?.[i] }))
+    .filter((r) => !live.some((l) => l.url === r.url));
+
+  const adopted = new Set(spec.adopted ?? []);
+  const toggle = (dna: DesignDNA, part: DnaPart) => setSpec((s) => togglePart(s, dna, part));
   const takeAll = (dna: DesignDNA) => {
     for (const p of PARTS) if (!adopted.has(p.id) && describes(p.id, dna, catalogue)) toggle(dna, p.id);
   };
+
+  const count = live.length + remembered.length;
 
   return (
     <div className="space-y-5">
@@ -129,7 +130,7 @@ export function ReferenceStep({ spec, setSpec, catalogue }: {
 
       <div className="flex gap-2">
         <Input placeholder="https://a-site-you-admire.com" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void start(); }} autoFocus />
-        <Button variant="primary" icon="video" onClick={start} disabled={!url.trim() || captureIds.length >= 3}>Look at it</Button>
+        <Button variant="primary" icon="video" onClick={start} disabled={!url.trim() || count >= 3}>Look at it</Button>
       </div>
       <p className="text-[13px] text-bone-3 measure">
         Up to three. Each is screenshotted while scrolling, recorded, and read for its design DNA —
@@ -137,7 +138,7 @@ export function ReferenceStep({ spec, setSpec, catalogue }: {
         of these questions open already answered.
       </p>
 
-      {captureIds.length === 0 && (
+      {count === 0 && (
         <div className="panel p-5 grid sm:grid-cols-3 gap-4">
           {[
             ['Screenshots', 'video', 'Five, at successive scroll positions, so scroll-triggered work actually triggers'],
@@ -153,18 +154,21 @@ export function ReferenceStep({ spec, setSpec, catalogue }: {
         </div>
       )}
 
-      {captureIds.map((id) => {
-        const c = captures[id];
+      {live.map(({ id, capture: c }) => {
         if (!c) return <div key={id} className="panel p-4 flex items-center gap-3"><Spinner /> Starting…</div>;
+        const busy = c.status === 'capturing' || c.status === 'analysing';
         return (
           <div key={id} className="panel overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-line gap-3">
               <div className="flex items-center gap-2 min-w-0"><Icon name="link" size={14} className="text-bone-3 shrink-0" /><span className="telemetry truncate">{c.url}</span></div>
-              <span className={cx('telemetry shrink-0', c.status === 'failed' ? 'text-danger' : c.status === 'done' ? 'text-volt' : 'text-bone-2')}>
-                {c.status === 'capturing' && <span className="inline-flex items-center gap-2"><Spinner size={12} /> looking at it…</span>}
-                {c.status === 'analysing' && <span className="inline-flex items-center gap-2"><Spinner size={12} /> reading the design…</span>}
-                {c.status === 'done' && 'understood'}
-                {c.status === 'failed' && 'failed'}
+              <span className="flex items-center gap-2 shrink-0">
+                <span className={cx('telemetry', c.status === 'failed' ? 'text-danger' : c.status === 'done' ? 'text-volt' : 'text-bone-2')}>
+                  {c.status === 'capturing' && <span className="inline-flex items-center gap-2"><Spinner size={12} /> looking at it…</span>}
+                  {c.status === 'analysing' && <span className="inline-flex items-center gap-2"><Spinner size={12} /> reading the design…</span>}
+                  {c.status === 'done' && 'understood'}
+                  {c.status === 'failed' && 'failed'}
+                </span>
+                {!busy && <button onClick={() => forget({ url: c.url }, id)} className="text-bone-4 hover:text-danger" title="Forget this reference"><Icon name="x" size={13} /></button>}
               </span>
             </div>
 
@@ -188,6 +192,13 @@ export function ReferenceStep({ spec, setSpec, catalogue }: {
               </div>
             )}
 
+            {busy && (
+              <p className="px-4 pb-4 text-[13px] text-bone-3 measure">
+                Stay here until this finishes — what it finds fills in the twelve screens after this
+                one, and moving on now would answer them from the defaults instead.
+              </p>
+            )}
+
             {c.error && <div className="p-4 text-[13px] text-danger">{c.error}</div>}
             {c.dna && (
               <>
@@ -198,26 +209,28 @@ export function ReferenceStep({ spec, setSpec, catalogue }: {
           </div>
         );
       })}
+
+      {remembered.map((r) => (
+        <div key={r.url} className="panel overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-line gap-3">
+            <div className="flex items-center gap-2 min-w-0"><Icon name="link" size={14} className="text-bone-3 shrink-0" /><span className="telemetry truncate">{r.url}</span></div>
+            <span className="flex items-center gap-2 shrink-0">
+              <span className="telemetry text-bone-3">read earlier</span>
+              <button onClick={() => forget(r)} className="text-bone-4 hover:text-danger" title="Forget this reference"><Icon name="x" size={13} /></button>
+            </span>
+          </div>
+          {r.dna ? (
+            <>
+              <DnaCard dna={r.dna} />
+              <Take dna={r.dna} catalogue={catalogue} adopted={adopted} onToggle={(p) => toggle(r.dna!, p)} onAll={() => takeAll(r.dna!)} />
+            </>
+          ) : (
+            <p className="p-4 text-[13px] text-bone-3">The address is in the brief. Press “Look at it” again to re-read the design.</p>
+          )}
+        </div>
+      ))}
     </div>
   );
-}
-
-/** What a part would set, in the catalogue's own words. Absent means nothing to take. */
-function describes(part: DnaPart, dna: DesignDNA, catalogue: Catalogue): string | undefined {
-  const s = dna.suggests ?? {};
-  const name = (list: { id: string; label: string }[], id?: string) => (id ? list.find((c) => c.id === id)?.label : undefined);
-  switch (part) {
-    case 'palette': return dna.customPalette ? 'its own five colours' : name(catalogue.palettes, s.palette);
-    case 'typography': return name(catalogue.typography, s.typography);
-    case 'atmosphere': return name(catalogue.atmospheres, s.atmosphere);
-    case 'layout': return name(catalogue.layouts, s.layout);
-    case 'scene': return name(catalogue.scenes, s.scene);
-    case 'motion': {
-      const parts = [name(catalogue.motionIntensity, s.motionIntensity), name(catalogue.scrollStyles, s.scrollStyle), name(catalogue.hoverStyles, s.hoverStyle)].filter(Boolean);
-      return parts.length ? parts.join(' · ') : undefined;
-    }
-    case 'signature': return s.signature ? (catalogue.signatures.find((x) => x.id === s.signature)?.label ?? s.signature) : undefined;
-  }
 }
 
 function Take({ dna, catalogue, adopted, onToggle, onAll }: {
@@ -286,6 +299,78 @@ function DnaCard({ dna }: { dna: DesignDNA }) {
       <div className="grid sm:grid-cols-2 gap-4 text-[13px]">
         <div><div className="legend !text-[10px] mb-1 text-volt">Keep the spirit of</div><ul className="list-disc pl-4 text-bone-2 space-y-0.5">{dna.keep.map((k) => <li key={k}>{k}</li>)}</ul></div>
         <div><div className="legend !text-[10px] mb-1 text-danger">Will not copy</div><ul className="list-disc pl-4 text-bone-2 space-y-0.5">{dna.avoid.map((k) => <li key={k}>{k}</li>)}</ul></div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * "The one your reference used", on the screen where it is the answer.
+ *
+ * Every design screen after the reference offers this band above its own
+ * options: what that site did for *this* question, with its own picture beside
+ * it, as a switch. It is the same `togglePart` the reference screen runs, so
+ * pressing it here and pressing it there are the same act — and un-pressing it
+ * hands the screen back to the catalogue.
+ */
+export function ReferenceBand({ spec, setSpec, catalogue, part, captureIds }: {
+  spec: Partial<Spec>;
+  setSpec: React.Dispatch<React.SetStateAction<Partial<Spec> & { name: string; folder: string }>>;
+  catalogue: Catalogue;
+  part: DnaPart;
+  captureIds: string[];
+}) {
+  const captures = useStore((s) => s.captures);
+  const dnas = spec.dna ?? [];
+  if (!dnas.length) return null;
+
+  const meta = PARTS.find((p) => p.id === part)!;
+  const adopted = new Set(spec.adopted ?? []);
+  const on = adopted.has(part);
+
+  const cards = dnas
+    .map((dna, i) => ({ dna, url: spec.references?.[i] ?? '', sets: describes(part, dna, catalogue) }))
+    .filter((c) => c.sets);
+  if (!cards.length) return null;
+
+  // Whichever capture matches by address still has the pictures.
+  const shotFor = (url: string) => Object.values(captures).find((c) => c.url === url)?.shots?.[1];
+
+  return (
+    <div className="panel overflow-hidden mb-6 border-volt-3/40">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-line bg-volt-2/40">
+        <span className="legend text-volt">From the site you pointed at</span>
+        <span className="telemetry text-bone-3 hidden sm:inline">{on ? 'in use — the options below are ignored' : 'off — the options below decide'}</span>
+      </div>
+      <div className="p-3 grid gap-2">
+        {cards.map((c) => (
+          <button
+            key={c.url + part}
+            type="button"
+            data-on={on}
+            onClick={() => setSpec((s) => togglePart(s, c.dna, part))}
+            className="opt !p-3 flex items-center gap-3.5 text-left"
+          >
+            {shotFor(c.url) ? (
+              <img src={shotFor(c.url)} alt="" className="w-[92px] h-[58px] object-cover object-top rounded-md border border-line shrink-0" />
+            ) : (
+              <span className="w-[92px] h-[58px] rounded-md border border-line bg-ink grid place-items-center shrink-0 text-bone-4"><Icon name={meta.icon} size={18} /></span>
+            )}
+            <span className="min-w-0 flex-1 pr-5">
+              <span className="block font-semibold text-[14px] leading-tight">{meta.label.replace(/^Its /, 'The ')} from {hostOf(c.url)}</span>
+              <span className="block telemetry text-volt mt-1 truncate">{on ? 'using' : 'would set'} · {c.sets}</span>
+              {part === 'palette' && c.dna.customPalette && (
+                <span className="flex gap-1 mt-1.5">
+                  {Object.values(c.dna.customPalette).map((hex, i) => <span key={i} className="w-4 h-4 rounded-full border border-line-2" style={{ background: hex }} />)}
+                </span>
+              )}
+            </span>
+            <span className={cx('chip shrink-0 !cursor-pointer', on && '!border-volt-3 !bg-volt-2')}>{on ? 'Using it' : 'Use it'}</span>
+          </button>
+        ))}
+        {captureIds.length === 0 && (
+          <p className="telemetry text-bone-4 px-1">Read earlier — the pictures are gone, the reading is not.</p>
+        )}
       </div>
     </div>
   );

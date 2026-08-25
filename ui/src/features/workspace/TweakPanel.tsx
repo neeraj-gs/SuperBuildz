@@ -37,7 +37,7 @@ export function TweakPanel({ projectId, onClose }: { projectId: string; onClose:
 
   if (!state) {
     return (
-      <aside className="w-[300px] shrink-0 border-l border-line bg-ink-2 grid place-items-center text-bone-3">
+      <aside className="w-[290px] xl:w-[320px] shrink-0 border-l border-line bg-ink-2 grid place-items-center text-bone-3">
         <span className="telemetry">reading the tokens…</span>
       </aside>
     );
@@ -88,7 +88,7 @@ export function TweakPanel({ projectId, onClose }: { projectId: string; onClose:
   const changed = Object.keys(state.values).length;
 
   return (
-    <aside className="w-[300px] shrink-0 border-l border-line bg-ink-2 flex flex-col min-h-0">
+    <aside className="w-[290px] xl:w-[320px] shrink-0 border-l border-line bg-ink-2 flex flex-col min-h-0 overflow-x-hidden">
       <header className="h-11 shrink-0 flex items-center justify-between px-3 border-b border-line">
         <span className="legend">Tune</span>
         <div className="flex items-center gap-1">

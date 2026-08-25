@@ -35,7 +35,8 @@ import { Button, Chip, Index, Input, Spinner, Textarea, cx } from '@/components/
 import { Icon } from '@/components/icons';
 import { ChipMany, PickMany, PickOne, PickSwatch } from './Pickers';
 import { LivePreview } from './LivePreview';
-import { ReferenceStep } from './ReferenceStep';
+import { ReferenceBand, ReferenceStep } from './ReferenceStep';
+import { partForStep } from './dna';
 import { PicturesStep } from './PicturesStep';
 import { CustomPaletteEditor } from './CustomPalette';
 import { FolderField } from '@/components/FolderPicker';
@@ -64,7 +65,13 @@ const STEPS = [
 type StepId = typeof STEPS[number]['id'];
 const DRAFT = 'sb:draft:v2';
 
-type Draft = Partial<Spec> & { name: string; folder: string };
+/**
+ * The draft is the spec plus two things that are not the spec: where the folder
+ * goes, and which captures were started. The capture ids used to live inside
+ * the reference screen's own state, which meant looking at the next screen
+ * threw away a reading that had taken two minutes.
+ */
+type Draft = Partial<Spec> & { name: string; folder: string; captureIds?: string[] };
 
 function restore(): { spec: Draft; at: number } | null {
   try { const raw = localStorage.getItem(DRAFT); if (!raw) return null; const d = JSON.parse(raw); return d?.spec ? d : null; } catch { return null; }
@@ -86,6 +93,7 @@ export function Wizard() {
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [folderNote, setFolderNote] = useState<string>('');
   const [showJump, setShowJump] = useState(false);
+  const captures = useStore((s) => s.captures);
 
   useEffect(() => { if (!catalogue) void useStore.getState().loadCatalogue(); }, [catalogue]);
   useEffect(() => { localStorage.setItem(DRAFT, JSON.stringify({ spec, at })); }, [spec, at]);
@@ -101,7 +109,7 @@ export function Wizard() {
       // and would be maddening to lose by pressing "restaurant".
       setSpec((s) => ({
         ...d,
-        ...pick(s, ['name', 'folder', 'details', 'references', 'dna', 'notes', 'theme', 'review', 'budgetUsd', 'stepNotes', 'imagery']),
+        ...pick(s, ['name', 'folder', 'details', 'references', 'dna', 'captureIds', 'notes', 'theme', 'review', 'budgetUsd', 'stepNotes', 'imagery']),
         ...adoptedOverrides(s),
         archetype: id,
         sector: undefined,
@@ -135,6 +143,21 @@ export function Wizard() {
     try { const r = await api.questions(spec); setQuestions(r.questions ?? []); if (r.error) toast(r.error, 'error'); } catch (e) { toast((e as Error).message, 'error'); } finally { setQBusy(false); }
   };
 
+  /*
+    A reading in progress holds the screen.
+
+    Not out of pedantry: what the reading finds is what pre-selects the twelve
+    screens after this one, so leaving early means answering all of them from
+    the archetype's defaults and then wondering why the reference did nothing.
+    It is a wait of about two minutes with pictures appearing throughout, which
+    is the one kind of wait people do not mind.
+  */
+  const reading = (spec.captureIds ?? []).some((id) => {
+    const c = captures[id];
+    return c?.status === 'capturing' || c?.status === 'analysing';
+  });
+  const held = step.id === 'reference' && reading;
+
   /**
    * Which screens can be jumped to.
    *
@@ -143,7 +166,7 @@ export function Wizard() {
    * selected and no defaults. The first two are always reachable; the rest open
    * as soon as there is something to open them onto.
    */
-  const reachable = (i: number) => i <= 1 || !!spec.archetype;
+  const reachable = (i: number) => !held && (i <= 1 || !!spec.archetype);
   const answered = (id: StepId): boolean => {
     switch (id) {
       case 'reference': return (spec.references?.length ?? 0) > 0;
@@ -183,7 +206,8 @@ export function Wizard() {
   };
 
   const goTo = (i: number) => { if (reachable(i)) { setAt(i); setShowJump(false); window.scrollTo({ top: 0, behavior: 'smooth' }); } };
-  const canNext = step.id !== 'what' || !!spec.archetype;
+
+  const canNext = (step.id !== 'what' || !!spec.archetype) && !held;
   const next = () => goTo(Math.min(STEPS.length - 1, at + 1));
   const back = () => goTo(Math.max(0, at - 1));
 
@@ -199,7 +223,9 @@ export function Wizard() {
         ...Object.entries(spec.stepNotes ?? {}).filter(([, v]) => v.trim()).map(([k, v]) => `On ${STEPS.find((s) => s.id === k)?.short ?? k}: ${v.trim()}`),
         ...Object.entries(answers).map(([q, a]) => `${questions?.find((x) => x.id === q)?.question ?? q}: ${a.join(', ')}`),
       ].filter(Boolean).join('\n');
-      const project = await api.createProject({ ...spec, notes });
+      // `captureIds` is this screen's bookkeeping, not part of the site.
+      const { captureIds: _ids, ...rest } = spec;
+      const project = await api.createProject({ ...rest, notes });
       localStorage.removeItem(DRAFT);
       await api.generate(project.id);
       navigate({ name: 'project', id: project.id });
@@ -209,6 +235,7 @@ export function Wizard() {
   if (!catalogue) return <div className="pt-24 flex items-center gap-3 text-bone-2 justify-center"><Spinner /> Loading the catalogue…</div>;
   const arch = catalogue.archetypes.find((a) => a.id === spec.archetype);
   const progressPct = ((at + 1) / STEPS.length) * 100;
+  const refPart = partForStep(step.id);
   const note = spec.stepNotes?.[step.id] ?? '';
   const setNote = (v: string) => setSpec((s) => ({ ...s, stepNotes: { ...(s.stepNotes ?? {}), [step.id]: v } }));
 
@@ -265,7 +292,22 @@ export function Wizard() {
           <p className="copy mt-3 mb-8">{step.lede}</p>
 
           <div key={step.id} className="fade">
-            {step.id === 'reference' && <ReferenceStep spec={spec} setSpec={setSpec} catalogue={catalogue} />}
+            {step.id === 'reference' && (
+              <ReferenceStep
+                spec={spec}
+                setSpec={setSpec}
+                catalogue={catalogue}
+                captureIds={spec.captureIds ?? []}
+                setCaptureIds={(ids) => setSpec((v) => ({ ...v, captureIds: ids }))}
+              />
+            )}
+
+            {/* Every design screen offers what the reference did, above its own
+                options — the same switch as on screen one, where the question
+                is actually being asked. */}
+            {refPart && (
+              <ReferenceBand spec={spec} setSpec={setSpec} catalogue={catalogue} part={refPart} captureIds={spec.captureIds ?? []} />
+            )}
 
             {step.id === 'what' && (
               <div className="space-y-6">
@@ -408,8 +450,13 @@ export function Wizard() {
 
           <div className="flex items-center justify-between mt-10 pt-6 border-t border-line">
             <Button variant="quiet" icon="arrowLeft" onClick={back} disabled={at === 0}>Back</Button>
-            <div className="flex items-center gap-2">
-              {step.id !== 'go' && step.id !== 'what' && <Button variant="quiet" onClick={next}>Skip</Button>}
+            <div className="flex items-center gap-3">
+              {held && (
+                <span className="telemetry text-bone-3 inline-flex items-center gap-2">
+                  <Spinner size={12} className="text-volt" /> still reading the design
+                </span>
+              )}
+              {step.id !== 'go' && step.id !== 'what' && <Button variant="quiet" onClick={next} disabled={held}>Skip</Button>}
               {step.id !== 'go' && <Button variant="primary" iconRight="arrowRight" onClick={next} disabled={!canNext}>{at === STEPS.length - 2 ? 'Review' : 'Next'}</Button>}
             </div>
           </div>

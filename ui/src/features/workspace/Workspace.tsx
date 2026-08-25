@@ -173,22 +173,37 @@ export function Workspace({ id }: { id: string }) {
           </aside>
         )}
 
-        <section className="min-h-0 flex flex-col bg-ink-3/40 lg:flex-row">
-          <div className="min-h-0 flex-1 flex flex-col">
+        <section className="min-h-0 min-w-0 flex flex-col bg-ink-3/40 lg:flex-row">
+          {/*
+            `min-w-0` on both of these, and it is load-bearing. A grid track and
+            a flex child are both `min-width: auto` by default, which means they
+            refuse to shrink below the intrinsic width of their contents — and
+            the contents here is a preview frame that can be 1440px wide. The
+            Tune panel was being pushed off the right edge of the window, half
+            of every label cut off, with no scrollbar to explain it.
+          */}
+          <div className="@container/pane min-h-0 min-w-0 flex-1 flex flex-col">
+            {/*
+              The bar has to survive the Tune panel taking 320px out of this
+              pane. Container queries rather than screen ones: what decides
+              whether "Directions" fits is the width of *this* column, not the
+              width of the window — a 1600px screen with the panel open and a
+              1280px one without it are the same problem.
+            */}
             <div className="h-11 shrink-0 flex items-center justify-between px-3 border-b border-line gap-2">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 <Seg on={view === 'site'} onClick={() => setView('site')}>Site</Seg>
-                <Seg on={view === 'admin'} onClick={() => setView('admin')}>CRM /admin</Seg>
-                <Seg on={view === 'files'} onClick={() => setView('files')} title="Browse and edit the project's files"><Icon name="doc" size={13} /> Files</Seg>
+                <Seg on={view === 'admin'} onClick={() => setView('admin')} title="The CRM at /admin">CRM<span className="hidden @[720px]/pane:inline">&nbsp;/admin</span></Seg>
+                <Seg on={view === 'files'} onClick={() => setView('files')} title="Browse and edit the project's files"><Icon name="doc" size={13} /><span className="hidden @[560px]/pane:inline">Files</span></Seg>
               </div>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 {view !== 'files' && (
                   <>
                     <DeviceMenu device={device} setDevice={setDevice} zoom={zoom} setZoom={setZoom} />
                     <span className="w-px h-5 bg-line mx-1" />
-                    <Seg on={directions} onClick={() => setDirections(true)} title="Three directions, side by side"><Icon name="layout" size={14} /> Directions</Seg>
-                    <Seg on={tuning} onClick={() => setTuning((t) => !t)} title="Tune the design — colour, type, space, motion"><Icon name="sliders" size={14} /> Tune</Seg>
+                    <Seg on={directions} onClick={() => setDirections(true)} title="Three directions, side by side"><Icon name="layout" size={14} /><span className="hidden @[880px]/pane:inline">Directions</span></Seg>
+                    <Seg on={tuning} onClick={() => setTuning((t) => !t)} title="Tune the design — colour, type, space, motion"><Icon name="sliders" size={14} /><span className="hidden @[640px]/pane:inline">Tune</span></Seg>
                     <span className="w-px h-5 bg-line mx-1" />
                   </>
                 )}
@@ -225,7 +240,9 @@ export function Workspace({ id }: { id: string }) {
                     {url && <a className="btn btn-quiet btn-sm" href={frameUrl} target="_blank" rel="noreferrer" title="Open in a tab"><Icon name="external" size={14} /></a>}
                   </>
                 ) : (
-                  <Button size="sm" icon="play" busy={starting} onClick={startPreview} disabled={project.status === 'draft'}>Start preview</Button>
+                  <Button size="sm" icon="play" busy={starting} onClick={startPreview} disabled={project.status === 'draft'} title="Start the site">
+                    <span className="hidden @[820px]/pane:inline">Start preview</span>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -313,7 +330,7 @@ function DeviceMenu({ device, setDevice, zoom, setZoom }: { device: DeviceId; se
     <div className="relative" ref={ref}>
       <Seg on={open || device !== 'fit'} onClick={() => setOpen((o) => !o)} title="Screen size">
         <Icon name={current.icon} size={14} />
-        <span className="telemetry">{current.width ? current.width : 'fit'}{zoom !== 1 ? ` · ${Math.round(zoom * 100)}%` : ''}</span>
+        <span className="telemetry hidden @[600px]/pane:inline">{current.width ? current.width : 'fit'}{zoom !== 1 ? ` · ${Math.round(zoom * 100)}%` : ''}</span>
       </Seg>
       {open && (
         <div className="absolute right-0 top-10 z-40 panel w-[240px] p-1.5 shadow-2xl shadow-black/60">

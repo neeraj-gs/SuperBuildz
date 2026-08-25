@@ -29,7 +29,16 @@ const FACES: Record<string, { display: string; body: string; weight: number; tra
 
 export function LivePreview({ spec, catalogue, name }: { spec: Partial<Spec>; catalogue: Catalogue; name: string }) {
   const pal = catalogue.palettes.find((p) => p.id === spec.palette) ?? catalogue.palettes[0];
-  const [bg, fg, accent, muted, surface] = pal.swatch ?? ['#0A0B0D', '#EDE9E0', '#C8FF3D', '#6C6F78', '#15171B'];
+  /*
+    Colours mixed by hand — or sampled off a reference site — outrank the
+    listed palette, exactly as they do in the generated site. Without this the
+    preview answered a question nobody had asked: you drag five swatches, or
+    press "take their colours", and the thing beside you does not move.
+  */
+  const c = spec.customPalette;
+  const [bg, fg, accent, muted, surface] = c
+    ? [c.bg, c.fg, c.accent, c.muted, c.surface]
+    : pal.swatch ?? ['#0A0B0D', '#EDE9E0', '#C8FF3D', '#6C6F78', '#15171B'];
   const palette: ScenePalette = useMemo(() => {
     // Light theme flips ground and ink, keeps the accent.
     if (spec.theme === 'light' && isDark(bg)) return { bg: fg, fg: bg, accent, muted, surface: '#F3F1EC' };
@@ -39,7 +48,7 @@ export function LivePreview({ spec, catalogue, name }: { spec: Partial<Spec>; ca
   const face = FACES[spec.typography ?? 'grotesk'] ?? FACES.grotesk;
   const Scene = sceneComponentFor(spec.scene ?? 'field');
   const pace = spec.motionIntensity === 'calm' ? 420 : spec.motionIntensity === 'cinematic' ? 820 : 600;
-  const signature = [spec.palette, spec.typography, spec.atmosphere, spec.layout, spec.scene, spec.motionIntensity, spec.theme, spec.hoverStyle, spec.cursorStyle].join(':');
+  const signature = [spec.palette, JSON.stringify(spec.customPalette ?? null), spec.typography, spec.atmosphere, spec.layout, spec.scene, spec.motionIntensity, spec.theme, spec.hoverStyle, spec.cursorStyle].join(':');
   const [beat, setBeat] = useState(0);
   useEffect(() => { setBeat((n) => n + 1); }, [signature]);
 
