@@ -11,6 +11,7 @@ import { Wizard } from '@/features/wizard/Wizard';
 import { Workspace } from '@/features/workspace/Workspace';
 import { Revamp } from '@/features/revamp/Revamp';
 import { Board } from '@/features/board/Board';
+import { ContactModal } from '@/features/landing/Contact';
 
 /**
  * One shell, one header. The header is defined here and nowhere else — an
@@ -21,6 +22,8 @@ export function App() {
   const route = useStore((s) => s.route);
   const connected = useStore((s) => s.connected);
   const detection = useStore((s) => s.detection);
+  // Not in the store: nothing else needs to know, and nothing else opens it.
+  const [contact, setContact] = useState(false);
 
   useEffect(() => { connect(); }, []);
   useEffect(() => {
@@ -39,7 +42,7 @@ export function App() {
 
   return (
     <div className="min-h-full flex flex-col">
-      <TopBar overlay={overlay} />
+      <TopBar overlay={overlay} onContact={() => setContact(true)} />
       <main className={cx('flex-1', overlay ? '' : 'pb-24')}>
         {route.name === 'landing' && <Landing />}
         {route.name === 'setup' && <Setup />}
@@ -50,11 +53,12 @@ export function App() {
       </main>
       <Toasts />
       <Dialogs />
+      <ContactModal open={contact} onClose={() => setContact(false)} />
     </div>
   );
 }
 
-function TopBar({ overlay }: { overlay: boolean }) {
+function TopBar({ overlay, onContact }: { overlay: boolean; onContact: () => void }) {
   const route = useStore((s) => s.route);
   const detection = useStore((s) => s.detection);
   const capacity = useStore((s) => s.capacity);
@@ -83,34 +87,60 @@ function TopBar({ overlay }: { overlay: boolean }) {
         overlay && !moved ? 'bg-transparent' : 'bg-ink/85 backdrop-blur-xl border-b border-line',
       )}
     >
-      <div className="h-full bleed flex items-center justify-between gap-4">
+      <div className="h-full bleed flex items-center justify-between gap-2 sm:gap-4">
         <button onClick={() => navigate({ name: 'landing' })} className="flex items-center shrink-0" aria-label="Super Builds — home">
-          <Logo />
+          <Logo from="sm" />
         </button>
 
-        <nav className="flex items-center gap-1">
-          <NavLink on={route.name === 'setup'} onClick={() => navigate({ name: 'setup' })}>
+        {/*
+          The bar is measured, not guessed.
+
+          Every label used to switch on at `sm`, all six at once, at a width
+          that could not hold them — so between 640 and 691 the page scrolled
+          sideways, and between 420 and 476 the wordmark did the same thing on
+          its own. Adding Contact widened both bands rather than creating them.
+
+          Three tiers now, each one taken from what the row actually measures:
+          below 640 it is a toolbar of marks with one word on the primary
+          action; from 640 the name and the three short labels appear; from 820
+          there is room for all of it. Nothing switches on until the row it
+          belongs to fits.
+        */}
+        {/* Tighter below 640: the row is marks there, and marks do not need
+            a word’s worth of air between them. */}
+        <nav className="flex items-center gap-0.5 sm:gap-1">
+          <NavLink on={route.name === 'setup'} onClick={() => navigate({ name: 'setup' })} title="What this machine needs installed">
             <Dot on={!!ready} tone={detection && !ready ? 'danger' : 'volt'} className={cx(!detection && 'pulse-dot')} />
-            <span className="hidden sm:inline">Requirements</span>
+            <span className="hidden min-[820px]:inline">Requirements</span>
           </NavLink>
-          <NavLink on={route.name === 'projects'} onClick={() => navigate({ name: 'projects' })}>Projects</NavLink>
+          <NavLink on={route.name === 'projects'} onClick={() => navigate({ name: 'projects' })} title="Your sites">
+            <span className="hidden sm:inline">Projects</span>
+            <span className="sm:hidden"><Icon name="cube" size={14} /></span>
+          </NavLink>
           {/* The count is the point: a header that says "3" while three builds
               run is the only place the parallelism is visible without opening
               anything. Absent when nothing is running, so it never reads as a
               badge that is always on. */}
-          <NavLink on={route.name === 'sessions'} onClick={() => navigate({ name: 'sessions' })}>
+          <NavLink on={route.name === 'sessions'} onClick={() => navigate({ name: 'sessions' })} title="Every conversation on this machine">
             <span className="hidden sm:inline">Sessions</span>
             <span className="sm:hidden"><Icon name="chat" size={14} /></span>
             {live > 0 && <span className="telemetry text-volt">{live}</span>}
           </NavLink>
-          {/* On a narrow screen the four controls were 516px wide on a 390px
-              phone and the last one simply left the building. The words go
-              first; the actions stay. */}
+          {/*
+            Contact is not a route and does not become one: what somebody wants
+            when they press it is an address, and a whole screen to hold five
+            lines of contact details is a screen you then have to navigate back
+            out of. It opens where you already are.
+          */}
+          <NavLink onClick={onContact} title="Who made this, and how to reach them">
+            <span className="hidden sm:inline">Contact</span>
+            <span className="sm:hidden"><Icon name="mail" size={14} /></span>
+          </NavLink>
           <Button size="sm" icon="refresh" onClick={() => navigate({ name: 'revamp' })} title="Redesign a site you already have">
-            <span className="hidden sm:inline">Revamp</span>
+            <span className="hidden min-[820px]:inline">Revamp</span>
           </Button>
-          <Button variant="primary" size="sm" icon="plus" className="ml-1.5" onClick={() => navigate({ name: 'new' })} title="Build a new site">
-            <span>New<span className="hidden sm:inline"> site</span></span>
+          <Button variant="primary" size="sm" icon="plus" className="ml-1 sm:ml-1.5" onClick={() => navigate({ name: 'new' })} title="Build a new site">
+            <span>New<span className="hidden min-[820px]:inline"> site</span></span>
           </Button>
           <Connection className="ml-1.5" />
         </nav>
@@ -119,12 +149,14 @@ function TopBar({ overlay }: { overlay: boolean }) {
   );
 }
 
-function NavLink({ children, on, onClick }: { children: React.ReactNode; on?: boolean; onClick: () => void }) {
+function NavLink({ children, on, onClick, title }: { children: React.ReactNode; on?: boolean; onClick: () => void; title?: string }) {
   return (
     <button
       onClick={onClick}
+      title={title}
       className={cx(
-        'inline-flex items-center gap-2 h-8 px-3 rounded-lg text-[13px] transition-colors',
+        // A mark does not need a word's worth of padding either side of it.
+        'inline-flex items-center gap-2 h-8 px-2 sm:px-3 rounded-lg text-[13px] transition-colors',
         on ? 'text-bone bg-ink-3' : 'text-bone-3 hover:text-bone hover:bg-ink-2',
       )}
     >

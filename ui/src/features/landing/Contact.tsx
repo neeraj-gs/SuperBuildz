@@ -23,9 +23,16 @@
  * Because it is not, and a contact section that implies otherwise turns the
  * first email into a complaint. The honest version — ask and I will send you a
  * build — is also the one that gets somebody to write.
+ *
+ * ── Why the card is a component ─────────────────────────────────────────────
+ *
+ * It appears twice: here, and behind Contact in the header. Those are two
+ * mounts of one `ContactCard` rather than two cards, because an address that
+ * is right in one place and stale in the other is worse than not listing it,
+ * and that is what a duplicated block of contact details always becomes.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Reveal, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
@@ -33,10 +40,9 @@ const EMAIL = 'gsneeraj2002@gmail.com';
 const MAILTO = `mailto:${EMAIL}?subject=${encodeURIComponent('Super Builds')}`;
 
 /**
- * Every one of these is on powerhouz.org, which is the other half of the same
- * work. The email is first because it is the one that gets answered, and it is
- * in the list rather than only on the button so it can be copied by somebody
- * whose machine has no mail client wired up — which is most machines.
+ * The email is first because it is the one that gets answered, and it is in the
+ * list rather than only on the button so it can be copied by somebody whose
+ * machine has no mail client wired up — which is most machines.
  */
 const ELSEWHERE: Array<{ label: string; shown: string; href: string; copy?: string }> = [
   { label: 'Email', shown: EMAIL, href: MAILTO, copy: EMAIL },
@@ -111,7 +117,7 @@ export function Contact() {
             <div key={chosen.id} className="panel bg-ink-2/80 backdrop-blur-sm mt-3 overflow-hidden fade">
               <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-line">
                 <Icon name="terminal" size={14} className="text-volt shrink-0" />
-                <code className="font-[family-name:var(--font-mono)] text-[12.5px] text-bone truncate">{chosen.run}</code>
+                <code className="font-[family-name:var(--font-mono)] text-[12.5px] text-bone truncate min-w-0">{chosen.run}</code>
                 <span className="flex-1" />
                 <Copy text={chosen.run} />
               </div>
@@ -136,59 +142,16 @@ export function Contact() {
           </div>
 
           {/* ------------------------------------------------------- me ---- */}
-          <Reveal>
-            <div className="panel bg-ink-2/80 backdrop-blur-sm p-6 md:p-7">
-              <h3 className="legend">Who made it</h3>
-              <p className="d3 mt-2.5">Neeraj GS</p>
-              <p className="text-[13.5px] leading-relaxed text-bone-2 mt-3">
-                I build this and{' '}
-                <a href="https://www.powerhouz.org/" target="_blank" rel="noreferrer noopener" className="text-bone underline decoration-line-3 underline-offset-[3px] hover:decoration-volt">
-                  PowerHouz
-                </a>
-                , an IDE for running several agents on one codebase at once. Both are local-first,
-                both drive the command line tools already on your machine, and neither one holds a
-                key for anybody.
-              </p>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Button variant="primary" icon="mail" onClick={() => { window.location.href = MAILTO; }}>
-                  Email me
-                </Button>
-                <Button variant="ghost" iconRight="external" onClick={() => window.open('https://www.powerhouz.org/', '_blank', 'noopener')}>
-                  powerhouz.org
-                </Button>
-              </div>
-
-              {/*
-                Rows rather than a row of icons: there is no recognisable glyph
-                for a portfolio, and five unlabelled marks make somebody guess
-                where each one goes. The address is the useful part, so the
-                address is what is shown — and the email row carries a copy,
-                because a mailto on a machine with no mail client set up opens
-                nothing at all and looks broken.
-              */}
-              <ul className="mt-5 border-t border-line">
-                {ELSEWHERE.map((l) => (
-                  <li key={l.label} className="flex items-center gap-2 border-b border-line">
-                    <a
-                      href={l.href}
-                      {...(l.copy ? {} : { target: '_blank', rel: 'noreferrer noopener' })}
-                      className="group flex-1 min-w-0 flex items-baseline gap-3 py-2.5 text-bone-2 hover:text-bone transition-colors"
-                    >
-                      <span className="legend w-[74px] shrink-0">{l.label}</span>
-                      <span className="text-[13px] truncate">{l.shown}</span>
-                      <span className="flex-1" />
-                      {!l.copy && <Icon name="external" size={12} className="shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity" />}
-                    </a>
-                    {l.copy && <Copy text={l.copy} />}
-                  </li>
-                ))}
-              </ul>
-
-              <p className="text-[12.5px] leading-relaxed text-bone-4 mt-5">
-                Ask for a build, ask a question, or tell me what is missing. If something in here
-                is wrong or slow or ugly, that is the email I most want.
-              </p>
+          {/*
+            `min-w-0`, because a grid item's automatic minimum is its content,
+            and the content here is a column of addresses that do not wrap. On a
+            narrow phone that made the longest of them — the email — push the
+            whole page sideways rather than letting `truncate` do its job. The
+            same rule bit the Tune panel and the step ticker; it is always this.
+          */}
+          <Reveal className="min-w-0">
+            <div className="panel bg-ink-2/80 backdrop-blur-sm p-5 sm:p-6 md:p-7">
+              <ContactCard />
             </div>
           </Reveal>
         </div>
@@ -198,11 +161,132 @@ export function Contact() {
 }
 
 /**
- * Copy the command.
+ * The card, and the only copy of it.
+ *
+ * The wrapper is the caller's: on the page it is a panel in a column, in the
+ * modal it is the modal. What is here is only ever the contents.
+ */
+export function ContactCard() {
+  return (
+    <>
+      <h3 className="legend">Who made it</h3>
+      <p className="d3 mt-2.5">Neeraj GS</p>
+      <p className="text-[13.5px] leading-relaxed text-bone-2 mt-3">
+        I built Super Builds. It runs on your machine, drives the command line tools you already
+        installed, and never holds a key for anybody — mine included.
+      </p>
+
+      <div className="mt-5">
+        <Button variant="primary" icon="mail" onClick={() => { window.location.href = MAILTO; }}>
+          Email me
+        </Button>
+      </div>
+
+      {/*
+        Rows rather than a row of icons: there is no recognisable glyph for a
+        portfolio, and five unlabelled marks make somebody guess where each one
+        goes. The address is the useful part, so the address is what is shown —
+        and the email row carries a copy, because a mailto on a machine with no
+        mail client set up opens nothing at all and looks broken.
+      */}
+      <ul className="mt-5 border-t border-line">
+        {ELSEWHERE.map((l) => (
+          <li key={l.label} className="flex items-center gap-2 border-b border-line">
+            <a
+              href={l.href}
+              {...(l.copy ? {} : { target: '_blank', rel: 'noreferrer noopener' })}
+              className="group flex-1 min-w-0 flex items-baseline gap-3 py-2.5 text-bone-2 hover:text-bone transition-colors"
+            >
+              <span className="legend w-[68px] sm:w-[74px] shrink-0">{l.label}</span>
+              {/*
+                Wraps rather than truncates. An address with its end cut off is
+                not a shortened address, it is an address nobody can use — and a
+                line that refuses to wrap has no minimum width, so on a narrow
+                phone it pushed the whole page sideways instead of yielding.
+              */}
+              <span className="text-[13px] break-all min-w-0">{l.shown}</span>
+              <span className="flex-1" />
+              {!l.copy && <Icon name="external" size={12} className="shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity" />}
+            </a>
+            {l.copy && <Copy text={l.copy} />}
+          </li>
+        ))}
+      </ul>
+
+      <p className="text-[12.5px] leading-relaxed text-bone-4 mt-5">
+        Ask for a build, ask a question, or tell me what is missing. If something in here is wrong
+        or slow or ugly, that is the email I most want.
+      </p>
+    </>
+  );
+}
+
+/**
+ * The same card, from the header, on any screen.
+ *
+ * The section only exists on the landing page, and the question it answers —
+ * how do I reach whoever made this — turns up most often somewhere else: half
+ * way through a build, on the requirements screen, when something has just gone
+ * wrong. So Contact is in the bar the whole time and the card comes to you.
+ *
+ * Conventions are `Dialog.tsx`'s, deliberately. Escape closes. The backdrop
+ * closes on mousedown rather than click, so a selection dragged out of the
+ * panel does not dismiss it — which is how you lose an address you were half
+ * way through copying. Focus goes into the panel and returns to whatever
+ * opened it.
+ */
+export function ContactModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const panel = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const before = document.activeElement as HTMLElement | null;
+    const t = setTimeout(() => panel.current?.focus(), 30);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('keydown', onKey, true);
+      // Back to the Contact button, so a keyboard is not dropped at the top of
+      // the document for having asked a question.
+      before?.focus?.();
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] grid place-items-center p-4 fade bg-ink/70 backdrop-blur-[3px]"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Contact Neeraj GS"
+    >
+      <div
+        ref={panel}
+        tabIndex={-1}
+        className="panel noise relative w-[min(460px,100%)] max-h-[min(88svh,760px)] overflow-y-auto p-6 shadow-2xl shadow-black/70 rise outline-none"
+      >
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-4 right-4 text-bone-4 hover:text-bone transition-colors"
+        >
+          <Icon name="x" size={14} />
+        </button>
+        <ContactCard />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Copy the command, or the address.
  *
  * `navigator.clipboard` is unavailable on an insecure origin that is not
  * loopback, and this page is served from one that is — but a browser can still
- * refuse, so the failure is silent and the command stays selectable either way.
+ * refuse, so the failure is silent and the text stays selectable either way.
  */
 function Copy({ text }: { text: string }) {
   const [done, setDone] = useState(false);

@@ -39,7 +39,7 @@ export function Dashboard() {
               : 'Nothing here yet.'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {projects.length > 1 && (
             <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-ink-2 border border-line">
               <Seg on={view === 'grid'} onClick={() => setView('grid')} title="Grid"><Icon name="grid" size={14} /></Seg>

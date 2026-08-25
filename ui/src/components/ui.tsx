@@ -60,17 +60,22 @@ export function Index({ n, children, className }: { n?: string | number; childre
   );
 }
 
-export function Logo({ size = 20, wordmark = true }: { size?: number; wordmark?: boolean }) {
+/**
+ * `from` is where the name is allowed to appear. The header runs out of room
+ * far earlier than the footer does — six controls beside it rather than one
+ * line of credits — so it asks for the later of the two. Both are written out
+ * because Tailwind reads the source for the classes it will need.
+ */
+export function Logo({ size = 20, wordmark = true, from = 'xs' }: { size?: number; wordmark?: boolean; from?: 'xs' | 'sm' }) {
   return (
     <span className="inline-flex items-center gap-2.5 select-none">
       <span className="inline-grid place-items-center rounded-[6px] bg-volt text-[color:var(--color-volt-ink)] shrink-0" style={{ width: size + 5, height: size + 5 }}>
         <Icon name="logo" size={size - 4} strokeWidth={2.4} />
       </span>
       {wordmark && (
-        // Below about 420px the mark plus the name plus four controls do not
-        // fit, and the name is the part a person can do without: the mark is
-        // still the way home.
-        <span className="hidden min-[420px]:inline font-[family-name:var(--font-display)] font-extrabold tracking-[-0.02em] text-[14px] leading-none">
+        // The name is the part a person can do without: the mark is still the
+        // way home.
+        <span className={cx('hidden font-[family-name:var(--font-display)] font-extrabold tracking-[-0.02em] text-[14px] leading-none', from === 'sm' ? 'sm:inline' : 'min-[420px]:inline')}>
           Super<span className="text-bone-3">Builds</span>
         </span>
       )}

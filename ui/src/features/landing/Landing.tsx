@@ -322,8 +322,8 @@ export function Landing() {
               {[
                 ['Email', 'mailto:gsneeraj2002@gmail.com?subject=Super%20Builds'],
                 ['Portfolio', 'https://www.neerajgs.dev/'],
+                ['LinkedIn', 'https://www.linkedin.com/in/neeraj-gs'],
                 ['GitHub', 'https://github.com/neeraj-gs'],
-                ['PowerHouz', 'https://www.powerhouz.org/'],
               ].map(([label, href]) => (
                 <a key={label} href={href} target="_blank" rel="noreferrer noopener" className="telemetry text-bone-3 hover:text-bone transition-colors">
                   {label}

@@ -468,13 +468,24 @@ It says plainly that there is no public download yet, because there is not, and
 a contact section that implies otherwise turns the first email into a
 complaint.
 
-The contact details are Neeraj GS's, and they are the same five that
-powerhouz.org carries — email, portfolio, LinkedIn, X, GitHub — shown as
-labelled rows rather than a strip of icons, because there is no recognisable
-glyph for a portfolio and five unlabelled marks make somebody guess. The email
-is first and carries a copy button: a `mailto:` on a machine with no mail
-client configured opens nothing at all and looks broken. The footer repeats
-four of them for somebody who scrolled past.
+The contact details are Neeraj GS's — email, portfolio, LinkedIn, X, GitHub —
+shown as labelled rows rather than a strip of icons, because there is no
+recognisable glyph for a portfolio and five unlabelled marks make somebody
+guess. The email is first and carries a copy button: a `mailto:` on a machine
+with no mail client configured opens nothing at all and looks broken. The
+footer repeats four of them for somebody who scrolled past.
+
+**`ContactCard` is a component with two mounts**, not two cards: the section
+above, and a modal behind **Contact** in the header. An address that is right
+in one place and stale in the other is worse than not listing it, and that is
+what a duplicated block of contact details always becomes. Contact is in the
+bar rather than being a route because the question turns up most often
+somewhere else — half way through a build, on the requirements screen, when
+something has just gone wrong — and a whole screen to hold five lines of
+contact details is a screen you then have to navigate back out of. The modal
+follows `Dialog.tsx` exactly: Escape closes, the backdrop closes on *mousedown*
+so a selection dragged out of the panel does not dismiss it, and focus goes
+into the panel and returns to the button that opened it.
 
 ## 6c. Ports, and the day one literal broke the product three ways
 
