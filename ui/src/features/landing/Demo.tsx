@@ -61,7 +61,10 @@ export const DEMO: { url: string; length?: string; chapters: Array<{ at: string;
   // field somebody cleared — would otherwise win over the real link and blank
   // the section.
   url: import.meta.env.VITE_DEMO_URL || WALKTHROUGH,
-  length: import.meta.env.VITE_DEMO_LENGTH || undefined,
+  // Read off the player rather than guessed. A running time on a button is a
+  // promise about how much of somebody's attention is being asked for, and one
+  // that is wrong is worse than one that is absent.
+  length: import.meta.env.VITE_DEMO_LENGTH || '1 min 59',
   chapters: [],
 };
 
