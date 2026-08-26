@@ -53,9 +53,15 @@ import { embedFor } from './embed';
  * there are some; they are times a person can press, not decoration, so an
  * invented one would be worse than none.
  */
+const WALKTHROUGH = 'https://drive.google.com/file/d/19JmMsx61VwqMgxWgLjmtnaHWVY-a7rHd/view?usp=sharing';
+
 export const DEMO: { url: string; length?: string; chapters: Array<{ at: string; label: string }> } = {
-  url: import.meta.env.VITE_DEMO_URL ?? '',
-  length: import.meta.env.VITE_DEMO_LENGTH ?? undefined,
+  // `||` rather than `??`, and the difference is load-bearing: an environment
+  // variable that is present but empty — which is what a host gives you for a
+  // field somebody cleared — would otherwise win over the real link and blank
+  // the section.
+  url: import.meta.env.VITE_DEMO_URL || WALKTHROUGH,
+  length: import.meta.env.VITE_DEMO_LENGTH || undefined,
   chapters: [],
 };
 
