@@ -46,7 +46,19 @@ state, which is a designed state rather than a hole.
 ## Deploying
 
 `vercel.json` is here and builds from the repository root, because the source
-is one folder up. From this directory:
+is one folder up.
+
+**`"ignoreCommand": "exit 1"` in that file is load-bearing, and it needs saying
+here because `vercel.json` has a strict schema and will not accept a comment.**
+Vercel skips a build when nothing under the project's root directory changed.
+This project's root directory is a lie about where its inputs are — every
+component it renders lives in `../ui/src` — so the first push that touched the
+landing page and not this folder was cancelled before it started, leaving the
+deployed page on the previous build with no failure anywhere to notice. `exit 1`
+means build; `exit 0` would mean skip. There is no commit this project can
+safely ignore.
+
+From this directory:
 
 ```
 vercel --prod

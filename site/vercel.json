@@ -5,7 +5,6 @@
   "installCommand": "npm install --prefix ..",
   "framework": null,
 
-  "//ignoreCommand": "Never skip. Vercel's monorepo optimisation skips a build when nothing under the project's root directory changed, and this project's root directory is a lie about where its inputs are: every component it renders lives in ../ui/src. The first push that touched the landing page and not this folder was cancelled before it started, with the page left on the previous build and no failure anywhere to notice. `exit 1` means build; `exit 0` would mean skip.",
   "ignoreCommand": "exit 1",
   "headers": [
     {
