@@ -46,6 +46,8 @@ import { Scenes } from './Scenes';
 import { Crm } from './Crm';
 import { Parallel } from './Parallel';
 import { Contact } from './Contact';
+import { Demo } from './Demo';
+import { Faq } from './Faq';
 
 const Spine = lazy(() => import('./Spine').then((m) => ({ default: m.Spine })));
 
@@ -119,6 +121,16 @@ export function Landing() {
             ))}
           </div>
         </div>
+
+        {/* ----------------------------------------------------------- Demo -- */}
+        {/*
+          Directly under the hero, because the first thing somebody wants after
+          "press things, ship something people remember" is to see somebody
+          press things. It is a plain section rather than a `Chapter`: it does
+          not claim a movement of the object behind the page, so the scene holds
+          whatever the hero left it on while you watch.
+        */}
+        <Demo />
 
         {/* --------------------------------------------------- Four presses -- */}
         <Chapter id="assemble" className="py-20 md:py-24">
@@ -310,34 +322,128 @@ export function Landing() {
         {/* -------------------------------------------------------- Contact -- */}
         <Contact />
 
-        <footer className="border-t border-line py-8 bg-ink/80 backdrop-blur-sm">
-          <div className="shell-wide flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-            <Logo />
-            <span className="telemetry text-bone-4 order-3 md:order-none">
-              Claude Code · React Three Fiber · Next.js · GSAP · Drizzle. Everything runs here.
-            </span>
-            {/* The same four addresses as the contact section, for somebody who
-                scrolled past it and is now at the bottom looking for them. */}
-            <nav className="flex items-center gap-4">
-              {[
-                ['Email', 'mailto:gsneeraj2002@gmail.com?subject=Super%20Builds'],
-                ['Portfolio', 'https://www.neerajgs.dev/'],
-                ['LinkedIn', 'https://www.linkedin.com/in/neeraj-gs'],
-                ['GitHub', 'https://github.com/neeraj-gs'],
-              ].map(([label, href]) => (
-                <a key={label} href={href} target="_blank" rel="noreferrer noopener" className="telemetry text-bone-3 hover:text-bone transition-colors">
-                  {label}
-                </a>
-              ))}
-            </nav>
-          </div>
-        </footer>
+        {/* ------------------------------------------------------------ FAQ -- */}
+        <Faq />
+
+        <Footer onStart={go} ready={ready} />
       </div>
     </div>
   );
 }
 
 /* ------------------------------------------------------------- pieces -- */
+
+/**
+ * The bottom of the page.
+ *
+ * ── What was there, and why it went ─────────────────────────────────────────
+ *
+ * "Claude Code · React Three Fiber · Next.js · GSAP · Drizzle. Everything runs
+ * here." — a list of dependencies, centred, in a footer. Two of those five
+ * names mean something to the person this page is for, and the sentence they
+ * were carrying ("everything runs here") is already the headline of the
+ * section immediately above it. It was filler wearing a badge.
+ *
+ * ── What a footer here is actually for ──────────────────────────────────────
+ *
+ * Somebody who read the whole page and did not press anything. That is not an
+ * uninterested reader — it is one who reached the bottom looking for the thing
+ * they wanted and did not find it on the way. So the footer is that: every
+ * door in the product, every place on this page, and every way to reach me,
+ * named in words, in three columns you can scan rather than one line you have
+ * to read.
+ */
+function Footer({ onStart, ready }: { onStart: () => void; ready?: boolean }) {
+  const COLUMNS: Array<{ title: string; links: Array<{ label: string; onClick?: () => void; href?: string }> }> = [
+    {
+      title: 'Build',
+      links: [
+        { label: ready ? 'A new site' : 'Start — check requirements', onClick: onStart },
+        { label: 'Revamp one you have', onClick: () => navigate({ name: 'revamp' }) },
+        { label: 'Your projects', onClick: () => navigate({ name: 'projects' }) },
+        { label: 'Every conversation', onClick: () => navigate({ name: 'sessions' }) },
+        { label: 'What this machine needs', onClick: () => navigate({ name: 'setup' }) },
+      ],
+    },
+    {
+      title: 'This page',
+      links: [
+        { label: 'Watch a full run', href: '#demo' },
+        { label: 'How you get it', href: '#contact' },
+        { label: 'Questions', href: '#faq' },
+        // A button rather than `#top`: the hero registers itself with the scene
+        // behind the page by id, and giving it a second, DOM one to be jumped
+        // to is two meanings for one attribute.
+        { label: 'Back to the top', onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+      ],
+    },
+    {
+      title: 'Neeraj GS',
+      links: [
+        { label: 'Email', href: 'mailto:gsneeraj2002@gmail.com?subject=Super%20Builds' },
+        { label: 'Portfolio', href: 'https://www.neerajgs.dev/' },
+        { label: 'LinkedIn', href: 'https://www.linkedin.com/in/neeraj-gs' },
+        { label: 'X', href: 'https://x.com/neeraj_gs_05' },
+        { label: 'GitHub', href: 'https://github.com/neeraj-gs' },
+      ],
+    },
+  ];
+
+  return (
+    <footer className="border-t border-line bg-ink/80 backdrop-blur-sm">
+      <div className="shell-wide py-12 md:py-14 grid gap-10 md:gap-8 md:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
+        <div className="min-w-0">
+          <Logo />
+          <p className="text-[13px] leading-relaxed text-bone-3 mt-4 max-w-[34ch]">
+            A website generator for people who press things. It runs on your laptop, drives the
+            Claude Code you already have, and every site it makes is a folder you own.
+          </p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-5">
+            {['No account', 'No token held', 'Nothing leaves this machine'].map((t) => (
+              <span key={t} className="telemetry text-bone-4 flex items-center gap-1.5">
+                <Icon name="check" size={11} className="text-volt-3" />{t}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {COLUMNS.map((col) => (
+          <nav key={col.title} className="min-w-0">
+            <h3 className="legend">{col.title}</h3>
+            <ul className="mt-3.5 grid gap-2">
+              {col.links.map((l) => (
+                <li key={l.label}>
+                  {l.href ? (
+                    <a
+                      href={l.href}
+                      {...(l.href.startsWith('http') ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
+                      className="text-[13px] text-bone-3 hover:text-bone transition-colors"
+                    >
+                      {l.label}
+                    </a>
+                  ) : (
+                    <button onClick={l.onClick} className="text-[13px] text-bone-3 hover:text-bone transition-colors text-left">
+                      {l.label}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))}
+      </div>
+
+      <div className="border-t border-line">
+        <div className="shell-wide py-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <span className="telemetry text-bone-4">© {new Date().getFullYear()} Neeraj GS</span>
+          <span className="telemetry text-bone-4">
+            There is no service here to cancel, and nothing that can be taken away.
+          </span>
+        </div>
+      </div>
+    </footer>
+  );
+}
 
 /**
  * A section that tells the scene behind it which chapter it is.

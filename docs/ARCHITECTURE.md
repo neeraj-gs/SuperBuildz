@@ -487,6 +487,60 @@ follows `Dialog.tsx` exactly: Escape closes, the backdrop closes on *mousedown*
 so a selection dragged out of the panel does not dismiss it, and focus goes
 into the panel and returns to the button that opened it.
 
+### The demo (`ui/src/features/landing/Demo.tsx`, `embed.ts`)
+
+Directly under the hero, because the first thing somebody wants after "press
+things, ship something people remember" is to watch somebody press things.
+**Demo** in the header goes there and starts it — a scroll and a play on the
+landing page, a navigation then a scroll then a play from anywhere else, which
+is why the request outlives the navigation in a module-level flag the section
+reads when it mounts rather than an event fired at a component that is not on
+screen yet. It is also the one nav item that appears on one route only: it is
+about this page rather than about the product, and the bar behind a build was
+measured for six controls.
+
+The video is one constant, `DEMO.url`. `embedFor` recognises Loom, Google
+Drive, YouTube and a direct file, and it is its own tested module because every
+one of those hosts has a share URL that is *not* an embed URL — paste the share
+URL into an iframe and the visitor gets a sign-in page, which on the section
+arguing that the product works reads as the product not working.
+
+Having no video is a designed state rather than an absent section, because the
+alternatives are a nav item pointing at nothing and an `<iframe src="">` that
+looks like a bug in the thing being demonstrated. It says the walkthrough is
+being recorded, in as many words, and offers the two things that are available
+now. The 16:9 belongs to the video and not to the panel: locking the empty
+state to it too put four lines of prose and two buttons into a 192px box on a
+phone and cut the buttons off.
+
+### The questions (`ui/src/features/landing/Faq.tsx`)
+
+Everything above it on the page is the argument and none of it is the answer to
+"will it work on my laptop", "do I own the site", "what does it cost me". Those
+get asked in an email or by closing the tab, and only one of the two is
+recoverable. The page's own rule still holds — a section has to *be* the thing
+it claims — and an FAQ where you press a question and get an answer is the
+product's thesis in miniature.
+
+One column, not two: an accordion in two columns reflows the opposite column
+every time a row opens, which moves the answer you were reading out from under
+you. And it sits on a panel, because the object behind this page is only hidden
+under the left-hand reading column — everything right of 62% is transparent by
+design — and fifteen questions read against moving geometry is the one thing
+the rest of the page is careful never to do.
+
+### The footer
+
+What was there was `Claude Code · React Three Fiber · Next.js · GSAP ·
+Drizzle. Everything runs here.` Two of those five names mean anything to the
+person this page is for, and the sentence they were carrying is already the
+headline of the section immediately above. It was filler wearing a badge.
+
+A footer here is for somebody who read the whole page and pressed nothing —
+which is not an uninterested reader, it is one who reached the bottom looking
+for something they did not find on the way. So it is three columns of doors:
+everything in the product, everything on this page, and every way to reach me.
+
 ## 6c. Ports, and the day one literal broke the product three ways
 
 Worth writing down because the failure was so much larger than the cause, and

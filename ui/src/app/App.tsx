@@ -12,6 +12,7 @@ import { Workspace } from '@/features/workspace/Workspace';
 import { Revamp } from '@/features/revamp/Revamp';
 import { Board } from '@/features/board/Board';
 import { ContactModal } from '@/features/landing/Contact';
+import { playDemo } from '@/features/landing/Demo';
 
 /**
  * One shell, one header. The header is defined here and nowhere else — an
@@ -132,6 +133,25 @@ function TopBar({ overlay, onContact }: { overlay: boolean; onContact: () => voi
             lines of contact details is a screen you then have to navigate back
             out of. It opens where you already are.
           */}
+          {/*
+            Demo is the seventh control on a bar that only just fitted six, and
+            it is the one that is genuinely about the landing page rather than
+            about the product — so it appears where the page it plays does, and
+            nowhere else. The bar behind a build stays the width it was
+            measured at.
+
+            Its word arrives at 900 rather than 820 with the others, and that
+            number is measured, not chosen: at 820 every other label switches on
+            at once and the row is exactly full, so a seventh word there pushed
+            the page 28px sideways from 820 to 849. The mark costs 30px less and
+            is a play triangle, which needs no word.
+          */}
+          {route.name === 'landing' && (
+            <NavLink onClick={playDemo} title="Watch a full run, start to finish" className="!px-2">
+              <span className="hidden min-[900px]:inline">Demo</span>
+              <span className="min-[900px]:hidden"><Icon name="play" size={13} /></span>
+            </NavLink>
+          )}
           <NavLink onClick={onContact} title="Who made this, and how to reach them">
             <span className="hidden sm:inline">Contact</span>
             <span className="sm:hidden"><Icon name="mail" size={14} /></span>
@@ -149,7 +169,7 @@ function TopBar({ overlay, onContact }: { overlay: boolean; onContact: () => voi
   );
 }
 
-function NavLink({ children, on, onClick, title }: { children: React.ReactNode; on?: boolean; onClick: () => void; title?: string }) {
+function NavLink({ children, on, onClick, title, className }: { children: React.ReactNode; on?: boolean; onClick: () => void; title?: string; className?: string }) {
   return (
     <button
       onClick={onClick}
@@ -158,6 +178,7 @@ function NavLink({ children, on, onClick, title }: { children: React.ReactNode; 
         // A mark does not need a word's worth of padding either side of it.
         'inline-flex items-center gap-2 h-8 px-2 sm:px-3 rounded-lg text-[13px] transition-colors',
         on ? 'text-bone bg-ink-3' : 'text-bone-3 hover:text-bone hover:bg-ink-2',
+        className,
       )}
     >
       {children}
