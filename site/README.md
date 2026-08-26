@@ -30,8 +30,12 @@ npm run build:site    # -> site/dist
 
 ## The demo video
 
-One variable, read at build time. Set it wherever you deploy and the page has
-the video without a commit:
+Set: the walkthrough is
+[`19JmMsx61VwqMgxWgLjmtnaHWVY-a7rHd`](https://drive.google.com/file/d/19JmMsx61VwqMgxWgLjmtnaHWVY-a7rHd/view)
+on Google Drive, 1 min 59, and it is the in-repo default in
+`../ui/src/features/landing/Demo.tsx` so both builds carry it.
+
+To point at a different cut without a commit, one variable, read at build time:
 
 ```
 VITE_DEMO_URL=https://drive.google.com/file/d/<id>/view
@@ -48,15 +52,26 @@ state, which is a designed state rather than a hole.
 `vercel.json` is here and builds from the repository root, because the source
 is one folder up.
 
-**`"ignoreCommand": "exit 1"` in that file is load-bearing, and it needs saying
-here because `vercel.json` has a strict schema and will not accept a comment.**
-Vercel skips a build when nothing under the project's root directory changed.
-This project's root directory is a lie about where its inputs are — every
-component it renders lives in `../ui/src` — so the first push that touched the
-landing page and not this folder was cancelled before it started, leaving the
-deployed page on the previous build with no failure anywhere to notice. `exit 1`
-means build; `exit 0` would mean skip. There is no commit this project can
-safely ignore.
+### One setting to change, and why
+
+**Set the Vercel project's Root Directory to the repository root (clear the
+`site` value) — Settings → General → Root Directory.**
+
+Vercel skips a build when nothing under the project's root directory changed,
+and with the root set to `site` that check is a lie about where this project's
+inputs are: every component it renders lives in `../ui/src`. A push that edits
+the landing page and not this folder is cancelled *before the build starts*,
+leaving the deployed page on the previous build with no failure anywhere to
+notice — silent staleness, which is the worst kind.
+
+`"ignoreCommand": "exit 1"` is in `vercel.json` and does **not** fix it: the
+skip happens before the repository is fetched, so nothing in `vercel.json` has
+been read yet. (The note has to live here because that schema rejects any key
+it does not recognise, including the `//` convention `package.json` allows.)
+
+The root `../vercel.json` is already written for the corrected setting —
+`buildCommand: npm run build:site`, `outputDirectory: site/dist` — so clearing
+the field is the whole of the change.
 
 From this directory:
 
