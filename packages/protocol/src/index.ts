@@ -435,6 +435,8 @@ export interface Turn {
   tools?: ToolCall[];
   /** Next-step chips Claude offered. */
   options?: string[];
+  /** Anything in this reply that must not be scrolled past. See `notices.ts`. */
+  notices?: Notice[];
   /** The checkpoint taken before this turn ran, so it can be undone. */
   checkpointId?: string;
   costUsd?: number;
@@ -531,6 +533,72 @@ export interface SessionCard {
 export interface SessionBoard {
   cards: SessionCard[];
   capacity: Capacity;
+}
+
+/* ---------------------------------------------------------------------------
+   The thing in a reply that must not be missed
+--------------------------------------------------------------------------- */
+
+/**
+ * `key` needs an environment variable. `decision` is a judgement call with
+ * alternatives. `blocked` cannot continue. `note` is important with nothing to
+ * press — and is the one to use least.
+ */
+export type NoticeKind = 'key' | 'decision' | 'blocked' | 'note';
+
+/**
+ * Lifted out of a reply and pinned above the composer, because being in the
+ * transcript and being seen are different things. The transcript keeps its
+ * copy in place; this is the one that follows you.
+ */
+export interface Notice {
+  id: string;
+  kind: NoticeKind;
+  /** One plain sentence that survives being read on its own. */
+  title: string;
+  body?: string;
+  /** Variable names, for `key`. Never values. */
+  keys?: string[];
+  /** Replies the person can send with one press, for `decision`. */
+  choices?: string[];
+  /** Answered, or acknowledged. It leaves the shelf and stays in the transcript. */
+  done?: boolean;
+}
+
+/* ---------------------------------------------------------------------------
+   Keys the site needs and has not got
+--------------------------------------------------------------------------- */
+
+/** Everything worth saying about one environment variable, minus its value. */
+export interface KeyField {
+  name: string;
+  /** What to put above the field. Usually the variable's own name. */
+  label: string;
+  /** Whose key it is — "Clerk", "Stripe" — when that is known. */
+  service?: string;
+  /** What it is for, in one sentence a non-coder can read. */
+  what: string;
+  /** The page this key is copied from. */
+  keysUrl?: string;
+  placeholder?: string;
+  /** False means it ships to the browser, which is the `NEXT_PUBLIC_` prefix. */
+  secret: boolean;
+}
+
+export interface KeyRequest extends KeyField {
+  /** How the tool knows it is wanted. */
+  from: 'preview' | 'placeholder' | 'example' | 'notice';
+  /** The site is broken right now for want of it. */
+  urgent: boolean;
+  why?: string;
+}
+
+/** What a project is waiting for, and what it already has. Names only. */
+export interface KeyState {
+  projectId: string;
+  needed: KeyRequest[];
+  /** Names of variables that have a value. Never the values. */
+  filled: string[];
 }
 
 /* ---------------------------------------------------------------------------
@@ -842,6 +910,7 @@ export type ServerEvent =
   | { type: 'approval.ask'; approval: Approval }
   | { type: 'approval.settled'; id: string; sessionId: string; decision: ApprovalDecision }
   | { type: 'approval.grants'; sessionId: string; granted: string[] }
+  | { type: 'keys.update'; state: KeyState }
   | { type: 'install.update'; message: string };
 
 /* ---------------------------------------------------------------------------

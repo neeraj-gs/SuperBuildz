@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { splitOptions, type Session, type ToolCall, type Turn } from '@superbuilds/protocol';
+import { splitNotices } from './notices.ts';
 import { startSession, resultError, writeHookSettings, type SessionHandle } from './claude.ts';
 import { checkpointsDir, getSession, saveSession, removeSession } from './store.ts';
 import { takeSnapshot, restoreSnapshot, pruneSnapshots } from './checkpoints.ts';
@@ -201,7 +202,11 @@ async function finishTurn(sessionId: string, rec: Record<string, unknown>) {
   l.turn = undefined;
 
   const raw = (t.blocks.length ? t.blocks.join('\n\n') : t.text).trim();
-  const { text, options } = splitOptions(raw);
+  // Notices first: the options block is instructed to come last, so a notice is
+  // above it, and stripping the options block first would leave the notice
+  // fence sitting in the visible prose.
+  const { text: withoutNotices, notices } = splitNotices(raw);
+  const { text, options } = splitOptions(withoutNotices);
   const error = resultError(rec as never);
   const cumulative = Number(rec.total_cost_usd ?? 0);
   const turnCost = Math.max(0, cumulative - l.costBase);
@@ -210,6 +215,7 @@ async function finishTurn(sessionId: string, rec: Record<string, unknown>) {
     id: t.id, role: 'assistant', text: text || (error ? '' : raw), at: Date.now(),
     tools: [...t.tools.values()], options, costUsd: turnCost, durationMs: Date.now() - t.startedAt,
     error: error ?? undefined,
+    ...(notices.length ? { notices } : {}),
   };
   const stageOf = s.turns.findLast((x) => x.role === 'user')?.stage;
   if (stageOf) turn.stage = stageOf;

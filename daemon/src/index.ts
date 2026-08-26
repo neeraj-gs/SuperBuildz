@@ -14,7 +14,9 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
-import type { Spec } from '@superbuilds/protocol';
+import type { Spec, KeyState } from '@superbuilds/protocol';
+import { keysNeeded, fillKeys } from './keys.ts';
+import { envEntries } from './env.ts';
 import { addClient, removeClient, send, broadcast, clientCount } from './bus.ts';
 import { detect } from './detection.ts';
 import { installPlan, runInstall, runAuthLogin, forgetProbes, provisionPrompt } from './install.ts';
@@ -381,6 +383,73 @@ app.post('/api/projects/:id/preview/check', async (req, reply) => {
   return health;
 });
 app.post('/api/projects/:id/thumbnail', async (req) => ({ thumbnail: await thumbnailFor((req.params as { id: string }).id) }));
+
+/* Keys the site needs and has not got */
+
+function keyState(project: { id: string; path: string }): KeyState {
+  return {
+    projectId: project.id,
+    needed: keysNeeded(project.path, previewState(project.id).health),
+    // Names only. The values are on disk, in the person's own project, and
+    // never travel over this socket in either direction except inbound once.
+    filled: envEntries(project.path).filter((e) => e.value.trim()).map((e) => e.key),
+  };
+}
+
+app.get('/api/projects/:id/keys', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  return keyState(p);
+});
+
+/**
+ * The values arrive, go into the project's own `.env.local`, and are gone.
+ *
+ * Nothing here logs them, echoes them, or puts them into the reply — the
+ * answer is the names it accepted, which is the most that can be said about a
+ * secret without saying it. The preview is then restarted, because a dev
+ * server reads its environment once at startup and the whole point of having
+ * been asked is that the site draws afterwards.
+ */
+app.post('/api/projects/:id/keys', async (req, reply) => {
+  const p = projectOr404((req.params as { id: string }).id, reply); if (!p) return;
+  const values = (req.body as { values?: Record<string, unknown> })?.values;
+  if (!values || typeof values !== 'object') return reply.code(400).send({ error: 'Nothing to save.' });
+
+  let written: string[];
+  try { written = fillKeys(p.path, values); } catch (err) { return reply.code(400).send({ error: (err as Error).message }); }
+
+  const state = keyState(p);
+  broadcast({ type: 'keys.update', state });
+
+  const wasRunning = previewState(p.id).running;
+  if (wasRunning && written.length) {
+    void (async () => {
+      try { await stopPreview(p.id); await startPreview(p.id, p.path); } catch { /* the panel reports its own state */ }
+    })();
+  }
+  return { written, restarting: wasRunning && written.length > 0 };
+});
+
+/**
+ * A notice has been dealt with, so it comes off the shelf.
+ *
+ * It stays in the transcript where it happened: the shelf is the list of what
+ * has not been answered, not a second copy of the conversation.
+ */
+app.post('/api/sessions/:id/notices/:noticeId', async (req, reply) => {
+  const { id, noticeId } = req.params as { id: string; noticeId: string };
+  const s = getSession(id); if (!s) return reply.code(404).send({ error: 'no such conversation' });
+  let found = false;
+  const turns = s.turns.map((t) => {
+    if (!t.notices?.some((n) => n.id === noticeId)) return t;
+    found = true;
+    return { ...t, notices: t.notices.map((n) => (n.id === noticeId ? { ...n, done: true } : n)) };
+  });
+  if (!found) return reply.code(404).send({ error: 'no such notice' });
+  const next = saveSession({ ...s, turns });
+  broadcast({ type: 'session.upsert', session: next });
+  return { ok: true };
+});
 
 /* Reference capture */
 

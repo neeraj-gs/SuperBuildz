@@ -23,7 +23,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PreviewState } from '@superbuilds/protocol';
-import { useStore, navigate, toast, ask, askText } from '@/lib/store';
+import { useStore, navigate, toast, ask, askText, askForKeys } from '@/lib/store';
 import { api } from '@/lib/api';
 import { Button, Dot, Logo, Spinner, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
@@ -38,6 +38,7 @@ import { AnalyticsPanel } from './AnalyticsPanel';
 import { EnginePanel } from './EnginePanel';
 import { NotesPanel, SessionTabs } from './Sessions';
 import { AccessPanel } from './Approvals';
+import { KeysDialog, KeysBadge } from './Keys';
 
 /** The screens worth checking, and the width each one really is. */
 const DEVICES = [
@@ -56,6 +57,7 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
   const generation = useStore((s) => s.generations[id]);
   const preview = useStore((s) => s.previews[id]);
   const sessions = useStore((s) => s.sessions);
+  const keysAsk = useStore((s) => s.keysAsk);
   // `wanted` is in the path when the board opened a particular conversation, so
   // landing on the project's default one instead would silently ignore the card
   // that was pressed.
@@ -108,6 +110,7 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
     if (!project) return;
     void api.generation(id).then((g) => { if (g) useStore.getState().apply({ type: 'generation.update', state: g }); }).catch(() => {});
     void api.preview(id).then((p) => useStore.getState().apply({ type: 'preview.update', state: p })).catch(() => {});
+    void api.keys(id).then((k) => useStore.setState((s) => ({ keys: { ...s.keys, [id]: k } }))).catch(() => {});
     api.projectSession(id).then((s) => { setSessionId(s.id); useStore.getState().apply({ type: 'session.upsert', session: s }); }).catch((e) => toast(e.message, 'error'));
   }, [project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -144,6 +147,15 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
   // Every new src is a new load, and the frame is not white for lack of content
   // until that load has finished.
   useEffect(() => { if (frameUrl) setFrameLoading(true); }, [frameUrl]);
+
+  // The preview naming a missing variable is the strongest evidence there is
+  // that a key is wanted, and it is the daemon that noticed. Ask again whenever
+  // it has looked, so the badge and the form agree with the panel.
+  const sawEnv = preview?.health?.missingEnv;
+  const checkedAt = preview?.health?.at;
+  useEffect(() => {
+    void api.keys(id).then((k) => useStore.setState((s) => ({ keys: { ...s.keys, [id]: k } }))).catch(() => {});
+  }, [sawEnv, checkedAt, id]);
 
   if (!project) return <div className="h-screen grid place-items-center text-bone-2"><Spinner /></div>;
 
@@ -190,6 +202,7 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
             <Logo size={18} wordmark={false} />
             <span className="font-semibold truncate">{project.name}</span>
             <span className={cx('telemetry', project.status === 'generating' ? 'text-volt' : project.status === 'failed' ? 'text-danger' : 'text-bone-3')}>{project.status === 'generating' ? 'building' : project.status}</span>
+            <KeysBadge projectId={id} onOpen={() => askForKeys(id)} />
             {project.deploy?.url && <a href={project.deploy.url} target="_blank" rel="noreferrer" className="telemetry text-volt hidden md:inline-flex items-center gap-1">{project.deploy.url.replace(/^https?:\/\//, '')} <Icon name="external" size={11} /></a>}
           </div>
           <div className="flex items-center gap-1.5">
@@ -232,7 +245,15 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
               width of the window — a 1600px screen with the panel open and a
               1280px one without it are the same problem.
             */}
-            <div className="h-11 shrink-0 flex items-center justify-between px-3 border-b border-line gap-2">
+            {/*
+              `overflow-x-auto`, and it is the difference between a toolbar that
+              scrolls and a page that does. Both groups in here are `shrink-0`
+              on purpose — a half-cut icon is worse than a hidden one — so below
+              464px the row cannot fit and, without this, pushed the whole
+              project screen sideways instead. A toolbar is exactly the kind of
+              thing that is allowed to scroll on its own.
+            */}
+            <div className="h-11 shrink-0 flex items-center justify-between px-3 border-b border-line gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
               <div className="flex items-center gap-1 shrink-0">
                 <Seg on={view === 'site'} onClick={() => setView('site')}>Site</Seg>
                 <Seg on={view === 'admin'} onClick={() => setView('admin')} title="The CRM at /admin">CRM<span className="hidden @[720px]/pane:inline">&nbsp;/admin</span></Seg>
@@ -307,7 +328,13 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
                     onFollow={setFollow}
                     refreshedAt={refreshedAt}
                     onReload={() => { setReload((n) => n + 1); setRefreshedAt(Date.now()); }}
-                    onEnv={() => { setOpenFile('.env.local'); setView('files'); }}
+                    /*
+                      Was "Edit .env.local", which opened a file editor. Naming
+                      the variable and then handing somebody who does not write
+                      code a dotfile is the diagnosis without the fix; this asks
+                      for the value in a field instead and writes it itself.
+                    */
+                    onEnv={() => askForKeys(id, preview?.health?.missingEnv ? [preview.health.missingEnv] : undefined)}
                   />
                 )}
                 <div className="flex-1 min-h-0 relative p-3">
@@ -369,6 +396,7 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
       {engine && <EnginePanel projectId={id} onClose={() => setEngine(false)} />}
       {notes && <NotesPanel projectId={id} onClose={() => setNotes(false)} />}
       {accessFor && <AccessPanel sessionId={accessFor} onClose={() => setAccessFor(undefined)} />}
+      {keysAsk?.projectId === id && <KeysDialog projectId={id} only={keysAsk.names} onClose={() => useStore.setState({ keysAsk: null })} />}
     </div>
   );
 }
@@ -435,7 +463,7 @@ function PreviewNote({ projectId, preview, building, follow, onFollow, refreshed
           <div className="min-w-0 flex-1">
             <p className="text-[13px] leading-relaxed text-bone-2">{health.reason}</p>
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              {health.missingEnv && <Button size="sm" variant="primary" icon="key" onClick={onEnv}>Edit .env.local</Button>}
+              {health.missingEnv && <Button size="sm" variant="primary" icon="key" onClick={onEnv}>Add the key</Button>}
               <Button size="sm" variant="quiet" icon="refresh" busy={checking || preview?.checking} onClick={check}>Look again</Button>
               {!!health.errors?.length && (
                 <button onClick={() => setShowLog((v) => !v)} className="telemetry text-bone-4 hover:text-bone px-2">

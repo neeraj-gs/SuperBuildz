@@ -12,6 +12,7 @@ import { useStore, toast, ask } from '@/lib/store';
 import { Button, Markdown, Spinner, Textarea, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { Approvals } from './Approvals';
+import { NoticeShelf, TurnNotices } from './Notices';
 
 export function Chat({ session, projectId, busy }: { session: Session; projectId: string; busy: boolean }) {
   const streaming = useStore((s) => s.streaming);
@@ -60,7 +61,7 @@ export function Chat({ session, projectId, busy }: { session: Session; projectId
       <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
         {visible.length === 0 && <div className="text-[13.5px] text-bone-3 text-center py-10">Say what you want changed, or press one of the actions below.</div>}
         {visible.map((t) => (
-          <TurnView key={t.id} turn={t} stream={streaming[t.id]} think={thinking[t.id]} showTools={!!showTools[t.id]} toggleTools={() => setShowTools((s) => ({ ...s, [t.id]: !s[t.id] }))} onUndo={t.role === 'user' && t.checkpointId && !running ? () => undo(t.id) : undefined} showThinking={showThinking} />
+          <TurnView key={t.id} turn={t} sessionId={session.id} projectId={projectId} stream={streaming[t.id]} think={thinking[t.id]} showTools={!!showTools[t.id]} toggleTools={() => setShowTools((s) => ({ ...s, [t.id]: !s[t.id] }))} onUndo={t.role === 'user' && t.checkpointId && !running ? () => undo(t.id) : undefined} showThinking={showThinking} />
         ))}
         <div ref={end} />
       </div>
@@ -88,11 +89,16 @@ export function Chat({ session, projectId, busy }: { session: Session; projectId
       )}
 
       {/*
-        Above the composer, below everything else: while one of these is on
-        screen the build is genuinely stopped, waiting on a press. It goes where
-        the person is already looking rather than at the end of a transcript
-        they would have to scroll to find.
+        The shelf.
+
+        Everything here is a thing that has not been dealt with, pinned above
+        the composer because that is where the person is already looking — the
+        answer to "nobody reads the whole transcript" is not to write more of
+        it. Notices first, approvals nearest the input: an approval has the
+        build genuinely stopped behind it, so it gets the shortest distance to
+        the eye and the cursor.
       */}
+      <NoticeShelf session={session} projectId={projectId} />
       <Approvals sessionId={session.id} />
 
       {/* Input */}
@@ -114,7 +120,7 @@ export function Chat({ session, projectId, busy }: { session: Session; projectId
   );
 }
 
-function TurnView({ turn, stream, think, showTools, toggleTools, onUndo, showThinking }: { turn: Turn; stream?: string; think?: string; showTools: boolean; toggleTools: () => void; onUndo?: () => void; showThinking: boolean }) {
+function TurnView({ turn, sessionId, projectId, stream, think, showTools, toggleTools, onUndo, showThinking }: { turn: Turn; sessionId: string; projectId: string; stream?: string; think?: string; showTools: boolean; toggleTools: () => void; onUndo?: () => void; showThinking: boolean }) {
   if (turn.role === 'system') return <div className="telemetry text-danger border border-danger/30 rounded-lg px-3 py-2 bg-danger/5">{turn.text}</div>;
   if (turn.role === 'user') {
     const stage = turn.stage;
@@ -147,6 +153,13 @@ function TurnView({ turn, stream, think, showTools, toggleTools, onUndo, showThi
         </div>
       )}
       {text ? <Markdown text={text} className="text-[14px] text-bone" /> : turn.partial ? <div className="text-bone-3 telemetry inline-flex items-center gap-2"><Spinner size={11} /> thinking…</div> : null}
+      {/*
+        Drawn here as well as on the shelf, and kept after it is dealt with. The
+        shelf is the list of what is outstanding; this is the record of what was
+        said and when, and a record that quietly rewrites itself when somebody
+        presses a button is not one.
+      */}
+      {turn.notices?.length ? <TurnNotices notices={turn.notices} projectId={projectId} /> : null}
       {turn.error && <div className="telemetry text-danger mt-2">{turn.error}</div>}
       {!turn.partial && (turn.costUsd || turn.durationMs) ? <div className="telemetry text-bone-4 mt-1.5">{turn.durationMs ? `${Math.round(turn.durationMs / 1000)}s` : ''}{turn.costUsd ? ` · $${turn.costUsd.toFixed(2)}` : ''}</div> : null}
     </div>

@@ -6,7 +6,7 @@
 
 import { create } from 'zustand';
 import type {
-  Detection, Project, Session, GenerationState, PreviewState, DeployState, ReferenceCapture, ServerEvent, Catalogue, Turn, ToolCall, TweakState, AnalyticsState, Capacity, Approval,
+  Detection, Project, Session, GenerationState, PreviewState, DeployState, ReferenceCapture, ServerEvent, Catalogue, Turn, ToolCall, TweakState, AnalyticsState, Capacity, Approval, KeyState,
 } from '@superbuilds/protocol';
 import { api, setToken } from './api';
 
@@ -119,6 +119,15 @@ interface State {
   approvals: Record<string, Approval[]>;
   /** Rule ids each conversation has already said yes to, keyed by conversation. */
   access: Record<string, string[]>;
+  /** What each project is waiting for. Names only — a value never enters the store. */
+  keys: Record<string, KeyState>;
+  /**
+   * A request to open the key form, from wherever noticed it was needed: the
+   * preview strip, a notice in the transcript, the badge in the header. The
+   * dialog itself belongs to the workspace, which is the only screen that can
+   * draw it, so the three of them ask rather than each carrying their own.
+   */
+  keysAsk: { projectId: string; names?: string[] } | null;
   capacity?: Capacity;
   toasts: Toast[];
   dialogs: Ask[];
@@ -154,6 +163,8 @@ export const useStore = create<State>((set, get) => ({
   analytics: {},
   approvals: {},
   access: {},
+  keys: {},
+  keysAsk: null,
   toasts: [],
   dialogs: [],
 
@@ -225,6 +236,7 @@ export const useStore = create<State>((set, get) => ({
         approvals: { ...s.approvals, [ev.sessionId]: (s.approvals[ev.sessionId] ?? []).filter((a) => a.id !== ev.id) },
       })); break;
       case 'approval.grants': set((s) => ({ access: { ...s.access, [ev.sessionId]: ev.granted } })); break;
+      case 'keys.update': set((s) => ({ keys: { ...s.keys, [ev.state.projectId]: ev.state } })); break;
       case 'session.remove': set((s) => { const sessions = { ...s.sessions }; delete sessions[ev.sessionId]; return { sessions }; }); break;
       default: break;
     }
@@ -308,6 +320,8 @@ window.addEventListener('popstate', () => useStore.setState({ route: parseRoute(
 
 export const navigate = (r: Route) => useStore.getState().navigate(r);
 export const toast = (text: string, kind?: Toast['kind']) => useStore.getState().toast(text, kind);
+/** Open the key form. `names` narrows it to the ones a notice asked about. */
+export const askForKeys = (projectId: string, names?: string[]) => useStore.setState({ keysAsk: { projectId, names } });
 
 let askSeq = 1;
 function open(a: Omit<Ask, 'id' | 'resolve'>): Promise<string | boolean | null> {

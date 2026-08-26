@@ -660,6 +660,76 @@ reach the same answer.
 Why the old list needed replacing, and the seven ordinary commands it was
 refusing, is in `docs/SECURITY.md`.
 
+## 6e. Being seen, which is not the same as being in the transcript
+
+The three features above all ended the same way: the tool worked out exactly
+what was wrong, wrote a good sentence about it, and put that sentence in a
+place nobody was going to read.
+
+A build is forty minutes of prose. The line that actually needed a person —
+*"those two pages read patient names and phone numbers, so I put them behind
+the login; tell me if you wanted them public"* — arrives in the middle of a
+paragraph, in the same weight as everything around it, and scrolls away. It was
+even introduced with "one thing I want to flag rather than bury". It was still
+buried.
+
+### The shelf (`ui/src/features/workspace/Notices.tsx`)
+
+A reply can carry an `sb-notice` block — same mechanism as the `sb-options`
+block the chips already come from, parsed in `daemon/src/notices.ts`, stripped
+out before anybody sees the text. It becomes a card pinned above the composer,
+where the person is already looking, and stays until it is answered.
+
+Four kinds, and the shape of the answer is the point of the distinction. A
+`decision` carries the alternatives it was choosing between, so overruling it is
+a press rather than a paragraph somebody has to compose. A `key` opens the
+field. `blocked` cannot continue. `note` is the one the prompt tells Claude to
+use least, because a card that appears every turn is a card nobody reads — which
+is the failure being fixed, not a different one.
+
+**It is not detected, it is declared.** Regexes for "you will need" and "I did
+not" would fire on half the paragraphs in a build and miss the one that
+mattered. The model knows which of its sentences needed a person; it is asked to
+say so, sparingly.
+
+**The transcript keeps a quieter copy.** The first version drew the same card in
+both places and, in a short conversation, you saw it twice in one screen — which
+reads as a bug rather than as emphasis. So they have different jobs: the shelf
+is the thing you act on, one at a time with the rest behind a count; the
+transcript gets one line where it happened, kept forever, gaining a tick rather
+than disappearing when it is dealt with. A record that rewrites itself when
+somebody presses a button is not a record.
+
+### Asking for a key (`daemon/src/keys.ts`, `ui/src/features/workspace/Keys.tsx`)
+
+A key is the one thing in this product that genuinely cannot be chosen from a
+list. Everything else is a press; this has to be typed, once. So it gets a
+field, with the service named, a link to the page the key is on, whether it
+ships to the browser, and — before anything is pasted — where the value ends
+up.
+
+*Needed* against *available* is the whole of the detection, because a tool that
+demands every optional key is a tool people learn to dismiss. Four sources: the
+preview saying the site is blank without it (strongest — it is broken *now*, and
+that one is marked urgent and sorted first); a commented empty line in
+`.env.local`, which is the convention Claude is told to follow when it builds
+something that needs one; an *uncommented* entry in `.env.example`; and an
+`sb-notice`. A commented line in `.env.example` is the menu, not the bill.
+
+There are three ways in — the preview strip, the notice card, the badge beside
+the project name — and one dialog, owned by the workspace, opened through the
+store. The badge is the answer to "people do not read transcripts": it is true
+from every tab of the project screen, including the ones that are not the
+conversation.
+
+The catalogue knows Clerk, Stripe, Resend, Supabase, Maps, Cloudinary and a
+dozen more, and folds in the analytics providers from `analytics.ts` rather than
+listing them twice. An unrecognised key is still perfectly askable — it just
+gets no link. Refusing to ask for what it does not recognise would make the
+whole thing useless for the interesting half of the world.
+
+What must never happen to the value is in `docs/SECURITY.md`.
+
 ## 7. Storage decisions
 
 | What | Where | Why |

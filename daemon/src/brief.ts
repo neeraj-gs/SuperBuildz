@@ -21,6 +21,7 @@ import {
   SIGNATURES, RHYTHMS, IMAGERY_DEVICES, beliefsFor, SCENES, THEMES,
 } from './catalogue/index.ts';
 import type { Choice } from '@superbuilds/protocol';
+import { NOTICE_INSTRUCTIONS } from './notices.ts';
 
 const label = (list: Choice[], id: string) => list.find((c) => c.id === id)?.label ?? id;
 
@@ -461,6 +462,7 @@ export function systemPromptFor(projectName: string, opts: { stage?: string } = 
     'How to reply:',
     '- Write for a non-coder: what you changed and where to look, in two to five short sentences. No file lists unless asked. No code unless asked.',
     '- When a request is ambiguous, make the choice a good designer would make, say what you chose, and offer the alternative as an option.',
+    NOTICE_INSTRUCTIONS,
     '- Always end your reply with a fenced block tagged `sb-options` containing a JSON array of 2 to 5 short follow-up messages the person might want to send next, phrased in the first person as they would say them (for example ["Make the hero text bigger", "Show me the contact page", "Publish it"]). Keep each under 60 characters. This block is turned into buttons; never put anything else after it.',
     ...(opts.stage ? ['', `Current generation stage: ${opts.stage}.`] : []),
   ].join('\n');
@@ -484,7 +486,7 @@ export const CHANGES: Choice[] = [
 
 const CHANGE_DIRECTION: Record<string, string> = {
   'add-page': 'Add the page named below. Build it from the components and tokens the site already has: read `design.config.ts` and two existing pages first and match them exactly. Add it to the navigation and the sitemap.',
-  'add-feature': 'Add the capability named below in the manner the rest of the site does things. Reuse the existing `<Form>`, error and success states, spacing. If it needs a key, read it from `process.env`, add a commented placeholder to `.env.local`, and say which variable to fill in — never ask for a value in the conversation.',
+  'add-feature': 'Add the capability named below in the manner the rest of the site does things. Reuse the existing `<Form>`, error and success states, spacing. If it needs a key, read it from `process.env`, add a commented placeholder to `.env.local`, and raise an `sb-notice` of kind `key` naming the variable — never ask for a value in the conversation, and never put one in a file.',
   restyle: 'Change the look through `design.config.ts` and `app/globals.css`, not by editing components. If something can only be changed by touching twenty components, that is a bug in the design system; fix that first. Keep both themes coherent if the site has two. Check `/admin` still looks right.',
   content: 'Change the words and images named below and nothing structural. Do not improve the layout, rename a component or reorganise a folder. The person asked for a copy change and any diff beyond that is noise they have to review.',
   hero: 'Change or tune the hero scene in `components/scenes/`. Keep the SceneCanvas contract (poster, lazy, reduced motion, DPR cap). If switching scenes, start from the corresponding component in `components/scenes/` and adapt it to the business as BRIEF.md describes. Re-shoot the home page and look at it.',
