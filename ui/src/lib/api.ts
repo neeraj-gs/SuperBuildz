@@ -6,7 +6,7 @@
 import type {
   Catalogue, Detection, InstallRecipeView, Plan, Project, Session, Spec, GenerationState, PreviewState, DeployState,
   ReferenceCapture, Choice, TweakState, Tweaks, Direction, FileEntry, FileBody, AdminLogin, AnalyticsState, EngineInfo, SiteSurvey, Understanding, Capacity, ProjectMemory, SessionBoard,
-  Approval, ApprovalDecision, MachineAccess,
+  Approval, ApprovalDecision, MachineAccess, SiteHealth,
 } from '@superbuilds/protocol';
 
 let token = '';
@@ -133,6 +133,7 @@ export const api = {
   preview: (id: string) => get<PreviewState>(`/api/projects/${id}/preview`),
   startPreview: (id: string) => post<PreviewState>(`/api/projects/${id}/preview/start`),
   stopPreview: (id: string) => post<PreviewState>(`/api/projects/${id}/preview/stop`),
+  checkPreview: (id: string) => post<SiteHealth>(`/api/projects/${id}/preview/check`),
   thumbnail: (id: string) => post<{ thumbnail?: string }>(`/api/projects/${id}/thumbnail`),
 
   referenceAvailable: () => get<{ ok: boolean; reason?: string }>('/api/reference/available'),

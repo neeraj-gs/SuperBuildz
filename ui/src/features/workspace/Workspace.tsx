@@ -22,9 +22,10 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { PreviewState } from '@superbuilds/protocol';
 import { useStore, navigate, toast, ask, askText } from '@/lib/store';
 import { api } from '@/lib/api';
-import { Button, Logo, Spinner, cx } from '@/components/ui';
+import { Button, Dot, Logo, Spinner, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { Chat } from './Chat';
 import { Stages } from './Stages';
@@ -80,6 +81,24 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
   const [reload, setReload] = useState(0);
   const [starting, setStarting] = useState(false);
   const [shooting, setShooting] = useState(false);
+  /*
+    ── Watching a build happen ──────────────────────────────────────────────
+
+    A build takes an hour and the site changes throughout it, but the frame
+    beside it only changed if the dev server's hot reload happened to survive —
+    and it does not survive a stage that rewrites fifty files. So the panel sat
+    on whatever it had loaded first, which for a site mid-scaffold is white,
+    for the whole hour.
+
+    A finished stage is the honest moment to look again: the site has
+    demonstrably changed, and it is roughly every ten minutes rather than every
+    few seconds. It is a toggle rather than a rule because the one time you do
+    not want the page reloading under you is the one time you are clicking
+    around inside it.
+  */
+  const [follow, setFollow] = useState(true);
+  const [refreshedAt, setRefreshedAt] = useState(0);
+  const [frameLoading, setFrameLoading] = useState(true);
 
   useEffect(() => {
     if (!project) void api.project(id).then((p) => useStore.getState().apply({ type: 'project.upsert', project: p })).catch(() => navigate({ name: 'projects' }));
@@ -112,6 +131,19 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
   const session = sessionId ? sessions[sessionId] : undefined;
   const url = preview?.url;
   const frameUrl = useMemo(() => (url ? `${url}${view === 'admin' ? '/admin' : ''}?sb=${reload}` : ''), [url, view, reload]);
+
+  const building = !!generation?.running;
+  const stagesDone = generation?.stages.filter((s) => s.status === 'done').length ?? 0;
+
+  useEffect(() => {
+    if (!building || !follow || !url) return;
+    setReload((n) => n + 1);
+    setRefreshedAt(Date.now());
+  }, [stagesDone, building, follow, url]);
+
+  // Every new src is a new load, and the frame is not white for lack of content
+  // until that load has finished.
+  useEffect(() => { if (frameUrl) setFrameLoading(true); }, [frameUrl]);
 
   if (!project) return <div className="h-screen grid place-items-center text-bone-2"><Spinner /></div>;
 
@@ -265,7 +297,20 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
                 <Files projectId={id} startAt={openFile} onClose={() => { setOpenFile(undefined); setView('site'); }} />
               </div>
             ) : (
-              <div className="flex-1 min-h-0 relative p-3">
+              <div className="flex-1 min-h-0 relative flex flex-col">
+                {url && (
+                  <PreviewNote
+                    projectId={id}
+                    preview={preview}
+                    building={building}
+                    follow={follow}
+                    onFollow={setFollow}
+                    refreshedAt={refreshedAt}
+                    onReload={() => { setReload((n) => n + 1); setRefreshedAt(Date.now()); }}
+                    onEnv={() => { setOpenFile('.env.local'); setView('files'); }}
+                  />
+                )}
+                <div className="flex-1 min-h-0 relative p-3">
                 {url ? (
                   <div className="h-full overflow-auto grid place-items-start justify-center">
                     <div
@@ -277,7 +322,18 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
                         transform: zoom === 1 ? undefined : `scale(${zoom})`,
                       }}
                     >
-                      <iframe key={frameUrl} src={frameUrl} title="preview" className="w-full h-full bg-white block" />
+                      <iframe key={frameUrl} src={frameUrl} title="preview" className="w-full h-full bg-white block" onLoad={() => setFrameLoading(false)} />
+                      {/*
+                        A white frame that is still loading and a white frame
+                        that drew nothing look identical, and the panel used to
+                        show the same thing for both. This is the difference,
+                        and it costs one event.
+                      */}
+                      {frameLoading && (
+                        <div className="absolute inset-0 grid place-items-center bg-ink-2">
+                          <div className="text-center"><Spinner className="text-volt mx-auto" /><div className="mt-2.5 telemetry text-bone-3">loading the page</div></div>
+                        </div>
+                      )}
                       {grid && <GridOverlay />}
                     </div>
                   </div>
@@ -299,6 +355,7 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             )}
           </div>
@@ -314,6 +371,113 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
       {accessFor && <AccessPanel sessionId={accessFor} onClose={() => setAccessFor(undefined)} />}
     </div>
   );
+}
+
+/**
+ * The strip between the toolbar and the site: what the preview is doing, and
+ * what is wrong with it.
+ *
+ * ── Why "the page is blank" needed saying at all ────────────────────────────
+ *
+ * The panel could report three states — starting, would not start, here is
+ * your site — and the fourth is the one that keeps happening. The server
+ * started, it answered 200, the frame loaded, and the page inside drew
+ * nothing. From out here that is a white rectangle, which is also what a site
+ * with a white hero looks like, so the panel showed the same thing for a
+ * working site and a broken one and left the person to guess which they had.
+ *
+ * It cannot be read from the frame: the preview runs on its own port, so it is
+ * a different origin. It is read on the daemon instead, by opening the same
+ * address in a real browser — `daemon/src/health.ts` — which is also where a
+ * console error becomes a sentence naming the variable and the file.
+ *
+ * ── Why the reason comes with the two presses that would fix it ─────────────
+ *
+ * "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing" and no way to add it is a
+ * diagnosis, not a fix. The file editor is already in this screen, so the
+ * sentence carries the button that opens it at the right file.
+ */
+function PreviewNote({ projectId, preview, building, follow, onFollow, refreshedAt, onReload, onEnv }: {
+  projectId: string;
+  preview?: PreviewState;
+  building: boolean;
+  follow: boolean;
+  onFollow: (v: boolean) => void;
+  refreshedAt: number;
+  onReload: () => void;
+  onEnv: () => void;
+}) {
+  const [checking, setChecking] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+  const [, tick] = useState(0);
+  const health = preview?.health;
+
+  // The "refreshed 40s ago" has to keep counting or it is a lie within a minute.
+  useEffect(() => {
+    if (!building) return;
+    const t = setInterval(() => tick((n) => n + 1), 15_000);
+    return () => clearInterval(t);
+  }, [building]);
+
+  const check = async () => {
+    setChecking(true);
+    try { await api.checkPreview(projectId); } catch (e) { toast((e as Error).message, 'error'); } finally { setChecking(false); }
+  };
+
+  const bad = health && health.state !== 'ok' && health.state !== 'unknown';
+  if (!bad && !building) return null;
+
+  return (
+    <div className="shrink-0 border-b border-line">
+      {bad && (
+        <div className={cx('px-3 py-2.5 flex items-start gap-2.5', health.state === 'error' || health.state === 'down' ? 'bg-danger/[0.07]' : 'bg-warn/[0.07]')}>
+          <Icon name="alert" size={15} className={cx('shrink-0 mt-0.5', health.state === 'empty' ? 'text-warn' : 'text-danger')} />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] leading-relaxed text-bone-2">{health.reason}</p>
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {health.missingEnv && <Button size="sm" variant="primary" icon="key" onClick={onEnv}>Edit .env.local</Button>}
+              <Button size="sm" variant="quiet" icon="refresh" busy={checking || preview?.checking} onClick={check}>Look again</Button>
+              {!!health.errors?.length && (
+                <button onClick={() => setShowLog((v) => !v)} className="telemetry text-bone-4 hover:text-bone px-2">
+                  {showLog ? 'hide' : 'what the browser said'}
+                </button>
+              )}
+            </div>
+            {showLog && !!health.errors?.length && (
+              <ul className="mt-2 space-y-1">
+                {health.errors.map((e, i) => <li key={i} className="telemetry text-bone-4 break-all">{e}</li>)}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
+      {building && (
+        <div className="px-3 h-8 flex items-center justify-between gap-3 bg-ink-2/60">
+          <span className="telemetry text-bone-3 flex items-center gap-2 min-w-0">
+            <Dot on={follow} tone="volt" className={follow ? 'pulse-dot' : undefined} />
+            <span className="truncate">
+              {follow
+                ? refreshedAt ? `following the build · reloaded ${ago(refreshedAt)}` : 'following the build · reloads as each stage finishes'
+                : 'not reloading on its own'}
+            </span>
+          </span>
+          <span className="flex items-center gap-1 shrink-0">
+            <button onClick={onReload} className="telemetry text-bone-4 hover:text-bone px-2">reload now</button>
+            <button onClick={() => onFollow(!follow)} className="telemetry text-bone-4 hover:text-bone px-2">{follow ? 'pause' : 'follow'}</button>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Rough, and rough on purpose: nobody needs the seconds after the first minute. */
+function ago(at: number): string {
+  const s = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (s < 45) return 'just now';
+  const m = Math.round(s / 60);
+  return m < 60 ? `${m} min ago` : `${Math.round(m / 60)}h ago`;
 }
 
 /**

@@ -25,7 +25,7 @@ import { createProject, deleteProject, folderFor, folderIsUsable, getProject, li
 import { getSession, saveSession, listSessions, capturesDir, thumbsDir } from './store.ts';
 import { createSession, sendTurn, stopTurn, rewindTo, closeAll, configureHooks, sessionIsBusy, renameSession, deleteSession } from './sessions.ts';
 import { runGeneration, cancelGeneration, generationState } from './generate.ts';
-import { previewState, startPreview, stopPreview, stopAllPreviews } from './preview.ts';
+import { previewState, startPreview, stopPreview, stopAllPreviews, checkPreview } from './preview.ts';
 import { startCapture, getCapture, captureAvailable, thumbnailFor } from './reference.ts';
 import { deployStatus, vercelLogin, deployProject, setEnvValue } from './deploy.ts';
 import { judge, hookResponse, RULES } from './policy.ts';
@@ -373,6 +373,13 @@ app.post('/api/projects/:id/preview/start', async (req, reply) => {
   return startPreview(p.id, p.path);
 });
 app.post('/api/projects/:id/preview/stop', async (req) => stopPreview((req.params as { id: string }).id));
+/* "It is white and I do not know why." Opens the same address in a real browser and says. */
+app.post('/api/projects/:id/preview/check', async (req, reply) => {
+  const p = getProject((req.params as { id: string }).id); if (!p) return reply.code(404).send({ error: 'no such project' });
+  const health = await checkPreview(p.id);
+  if (!health) return reply.code(409).send({ error: 'The preview is not running, so there is nothing to look at.' });
+  return health;
+});
 app.post('/api/projects/:id/thumbnail', async (req) => ({ thumbnail: await thumbnailFor((req.params as { id: string }).id) }));
 
 /* Reference capture */

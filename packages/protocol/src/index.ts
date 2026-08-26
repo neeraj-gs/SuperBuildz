@@ -606,6 +606,26 @@ export interface GenerationState {
   costUsd: number;
 }
 
+/**
+ * What a browser sees at the preview's address.
+ *
+ * `error` is the dev server failing. `empty` is the harder one and the reason
+ * this exists: the server answered, the frame loaded, and the page drew
+ * nothing — which from outside the frame is indistinguishable from a site with
+ * a white hero. See `daemon/src/health.ts`.
+ */
+export interface SiteHealth {
+  at: number;
+  state: 'ok' | 'empty' | 'error' | 'down' | 'unknown';
+  /** One sentence somebody can act on. Absent only when nothing is wrong. */
+  reason?: string;
+  /** The variable the site says it is missing, when it named one. */
+  missingEnv?: string;
+  /** What the browser actually logged. At most four, deduplicated. */
+  errors?: string[];
+  status?: number;
+}
+
 export interface PreviewState {
   projectId: string;
   running: boolean;
@@ -615,6 +635,10 @@ export interface PreviewState {
   exitCode?: number;
   error?: string;
   startedAt?: number;
+  /** The last look at what the address actually renders. */
+  health?: SiteHealth;
+  /** A check is running now, so the panel can say so rather than look stuck. */
+  checking?: boolean;
 }
 
 export interface DeployState {

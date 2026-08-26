@@ -530,6 +530,82 @@ The daemon also now says which port is taken when it cannot bind, instead of
 exiting with a stack trace about a socket while `dev.mjs` kills Vite alongside
 it.
 
+## 6d. The fourth state of a preview, and the question a hook can ask
+
+Two failures reported from the same hour of one real revamp, both of which the
+interface had no vocabulary for.
+
+### "It is white and I do not know why" (`daemon/src/health.ts`)
+
+The preview panel could report three things: the server is starting, the server
+would not start, or here is your site. The fourth is the one that keeps
+happening — the server started, answered `200`, the frame loaded, and the page
+inside drew nothing. From outside the frame that is a white rectangle, which is
+also what a site with a white hero looks like. The panel showed the same thing
+for a working site and a broken one.
+
+It cannot be read from the frame. The preview runs on its own port in the
+43000 band, so it is a different origin and nothing of ours can reach inside
+it. So it is read on the daemon, by opening the same address in the headless
+browser that is already here for reference captures, and reporting what a
+browser sees: the status, whether `document.body.innerText` has any length at
+all, and what was logged getting there.
+
+`explain()` is pure and separately tested, because it is the part that has to
+stay honest. Its job is to turn `@clerk/clerk-react: Missing publishableKey`
+into *"The page is blank because its sign-in library will not start without a
+key. Put `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` into `.env.local` and it will
+draw"* — and, just as importantly, to say *"the browser said: …"* when it does
+not recognise the cause rather than confidently naming the wrong one. The
+sentence arrives with the button that opens `.env.local` in the file editor
+already in that screen, because a diagnosis with no fix attached is half a
+feature.
+
+It runs when something could have changed the answer — the server first
+answered, a stage finished, somebody pressed *Look again* — never on a loop. It
+costs a browser launch, and a panel that re-diagnoses itself every five seconds
+turns one honest sentence into flicker.
+
+### The frame now follows the build
+
+A build takes an hour and the site changes throughout it, but the frame only
+changed if the dev server's hot reload happened to survive — and it does not
+survive a stage that rewrites fifty files. So the panel sat on whatever it
+loaded first, which for a site mid-scaffold is white, for the whole hour.
+
+A finished stage is the honest moment to look again: the site has demonstrably
+changed, and it is every ten minutes rather than every few seconds. A strip
+above the frame says so and counts, and it is a toggle, because the one time
+you do not want the page reloading under you is the one time you are clicking
+around inside it.
+
+The frame also distinguishes *loading* from *blank* now, which costs one
+`onLoad` and was the difference between two identical white rectangles.
+
+### A refusal Claude reads is a refusal Claude routes around (`daemon/src/approvals.ts`)
+
+The PreToolUse hook is synchronous: while the daemon has not replied, the tool
+call has not happened. That gap is big enough to put a question in, and doing so
+turns the whole permission model round.
+
+Before, a refusal was final and the model was told about it afterwards, so it
+did the sane thing and worked around it — the reported transcript shows it
+rewriting its plan four times, with four red banners going past and no control
+anywhere to say "yes, obviously". Now everything except the three
+never-allowable rules stops, shows the person the verbatim command, and takes
+*once* / *always in this conversation* / *no*. Their answer is the hook's reply,
+so a yes runs the original command, first time.
+
+The card is pinned above the composer rather than left in the transcript,
+because while it is on screen the build is genuinely stopped. It counts down,
+because it refuses itself after 150 seconds and a control that expires without
+saying so has lied to you. And with no browser connected the daemon refuses in
+about 25ms instead of stalling an unattended build for two and a half minutes to
+reach the same answer.
+
+Why the old list needed replacing, and the seven ordinary commands it was
+refusing, is in `docs/SECURITY.md`.
+
 ## 7. Storage decisions
 
 | What | Where | Why |

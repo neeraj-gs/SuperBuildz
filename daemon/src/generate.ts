@@ -14,7 +14,7 @@ import { scaffoldProject } from './scaffold.ts';
 import { createSession, sendTurn, stopTurn, sessionIsBusy } from './sessions.ts';
 import { getSession } from './store.ts';
 import { stagesFor } from './brief.ts';
-import { startPreview } from './preview.ts';
+import { startPreview, checkPreview } from './preview.ts';
 import { thumbnailFor } from './reference.ts';
 import { proposeDirections } from './directions.ts';
 import { surveySite } from './survey.ts';
@@ -91,6 +91,13 @@ export async function runGeneration(projectId: string): Promise<GenerationState>
       const cur = states.get(projectId);
       push(projectId, { costUsd: (cur?.costUsd ?? 0) + (turn.costUsd ?? 0) });
       setStage(projectId, stage.id, { status: 'done', endedAt: Date.now() });
+      /*
+        A finished stage is the one moment the site has demonstrably changed, so
+        it is when the panel beside it should stop being white and start being
+        wrong for a reason. Fire and forget: a diagnosis that fails is not a
+        build that failed.
+      */
+      void checkPreview(projectId).catch(() => {});
 
       // As soon as the identity exists there is something to vary, so the
       // three directions are proposed in the background — by the time the
@@ -183,6 +190,13 @@ async function runRevamp(projectId: string): Promise<GenerationState> {
       const cur = states.get(projectId);
       push(projectId, { costUsd: (cur?.costUsd ?? 0) + (turn.costUsd ?? 0) });
       setStage(projectId, stage.id, { status: 'done', endedAt: Date.now() });
+      /*
+        A finished stage is the one moment the site has demonstrably changed, so
+        it is when the panel beside it should stop being white and start being
+        wrong for a reason. Fire and forget: a diagnosis that fails is not a
+        build that failed.
+      */
+      void checkPreview(projectId).catch(() => {});
       if (stage.id === 'identity' && spec.directions !== false) void proposeDirections(projectId).catch(() => {});
     } catch (err) {
       const msg = (err as Error).message;

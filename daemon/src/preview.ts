@@ -7,7 +7,8 @@
  */
 
 import type { ChildProcess } from 'node:child_process';
-import type { PreviewState } from '@superbuilds/protocol';
+import type { PreviewState, SiteHealth } from '@superbuilds/protocol';
+import { checkSite } from './health.ts';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnBin, execPlain } from './binaries.ts';
@@ -70,7 +71,7 @@ export async function startPreview(projectId: string, projectPath: string, avoid
     // stopped" leaves them with a blank panel and no idea why — which is
     // exactly what a squatted port looked like.
     if (startedOk || code === 0 || code === null) {
-      push(projectId, { running: false, exitCode: code ?? undefined, url: undefined, error: undefined });
+      push(projectId, { running: false, exitCode: code ?? undefined, url: undefined, error: undefined, health: undefined, checking: false });
       return;
     }
 
@@ -78,13 +79,13 @@ export async function startPreview(projectId: string, projectPath: string, avoid
       // Something else already holds the port — usually a dev server orphaned
       // when a previous daemon was killed rather than closed. Move over rather
       // than making this project permanently un-previewable.
-      push(projectId, { running: false, exitCode: code, url: undefined, error: `Port ${port} was taken. Trying another…` });
+      push(projectId, { running: false, exitCode: code, url: undefined, error: `Port ${port} was taken. Trying another…`, health: undefined, checking: false });
       previews.delete(projectId);
       void startPreview(projectId, projectPath, [...avoid, port]).catch(() => {});
       return;
     }
 
-    push(projectId, { running: false, exitCode: code, url: undefined, error: explain(log, code) });
+    push(projectId, { running: false, exitCode: code, url: undefined, error: explain(log, code), health: undefined, checking: false });
   });
 
   // Poll until it answers, so `url` means "will render" rather than "was printed".
@@ -95,7 +96,13 @@ export async function startPreview(projectId: string, projectPath: string, avoid
       if (!r || r.child.exitCode !== null) return;
       try {
         const res = await fetch(target, { signal: AbortSignal.timeout(3000) });
-        if (res.status < 500) { push(projectId, { url: target }); return; }
+        if (res.status < 500) {
+          push(projectId, { url: target });
+          // Answering is not the same as rendering. Give the first compile a
+          // moment and then find out which of the two this is.
+          setTimeout(() => void checkPreview(projectId), 4_000).unref?.();
+          return;
+        }
       } catch { /* not yet */ }
       await new Promise((r) => setTimeout(r, 1000));
     }
@@ -104,11 +111,38 @@ export async function startPreview(projectId: string, projectPath: string, avoid
   return state;
 }
 
+/**
+ * Look at what the address actually draws, and put the answer on the state.
+ *
+ * Deliberately not a loop. It runs when something has changed that could have
+ * changed the answer — the server first answered, a stage finished, somebody
+ * pressed the button — because it costs a browser launch, and because a panel
+ * that re-diagnoses itself every five seconds turns one honest sentence into
+ * flicker.
+ */
+export async function checkPreview(projectId: string): Promise<SiteHealth | undefined> {
+  const r = previews.get(projectId);
+  const url = r?.state.url;
+  if (!url) return undefined;
+  if (r.state.checking) return r.state.health;
+
+  push(projectId, { checking: true });
+  try {
+    const health = await checkSite(url);
+    push(projectId, { health, checking: false });
+    return health;
+  } catch (err) {
+    const health: SiteHealth = { at: Date.now(), state: 'unknown', reason: (err as Error).message.slice(0, 200) };
+    push(projectId, { health, checking: false });
+    return health;
+  }
+}
+
 export async function stopPreview(projectId: string): Promise<PreviewState> {
   const r = previews.get(projectId);
   if (!r) return previewState(projectId);
   await killTree(r.child);
-  push(projectId, { running: false, url: undefined });
+  push(projectId, { running: false, url: undefined, health: undefined, checking: false });
   releasePort(`preview:${projectId}`);
   previews.delete(projectId);
   return { projectId, running: false, log: r.state.log };
