@@ -15,20 +15,21 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import type { Spec } from '@superbuilds/protocol';
-import { addClient, removeClient, send, broadcast } from './bus.ts';
+import { addClient, removeClient, send, broadcast, clientCount } from './bus.ts';
 import { detect } from './detection.ts';
 import { installPlan, runInstall, runAuthLogin, forgetProbes, provisionPrompt } from './install.ts';
 import { CATALOGUE, defaultsFor, completeSpec } from './catalogue/index.ts';
 import { planFor, questionsPrompt, QUESTIONS_SCHEMA, namesPrompt, NAMES_SCHEMA, CHANGES, changeBrief } from './brief.ts';
 import { askOnce, listModels } from './claude.ts';
 import { createProject, deleteProject, folderFor, folderIsUsable, getProject, listProjects, updateProject } from './projects.ts';
-import { getSession, listSessions, capturesDir, thumbsDir } from './store.ts';
+import { getSession, saveSession, listSessions, capturesDir, thumbsDir } from './store.ts';
 import { createSession, sendTurn, stopTurn, rewindTo, closeAll, configureHooks, sessionIsBusy, renameSession, deleteSession } from './sessions.ts';
 import { runGeneration, cancelGeneration, generationState } from './generate.ts';
 import { previewState, startPreview, stopPreview, stopAllPreviews } from './preview.ts';
 import { startCapture, getCapture, captureAvailable, thumbnailFor } from './reference.ts';
 import { deployStatus, vercelLogin, deployProject, setEnvValue } from './deploy.ts';
-import { judge, hookResponse } from './policy.ts';
+import { judge, hookResponse, RULES } from './policy.ts';
+import { askFor, granted, grant, revoke, grantsFor, pendingFor, settleApproval, dropSession } from './approvals.ts';
 import { tweakState, setTweaks, shufflePalette } from './tweaks.ts';
 import { proposeDirections, readDirections, chooseDirection } from './directions.ts';
 import { checkMediaFolder, newUploadFolder, saveUpload, removeUpload, fetchImages, listUploads } from './media.ts';
@@ -590,6 +591,8 @@ app.delete('/api/sessions/:id', async (req, reply) => {
   // with nothing to talk to.
   if (p && listSessions(p.id).length <= 1) return reply.code(400).send({ error: 'That is the only conversation about this project.' });
   deleteSession(s.id);
+  // Anything it left open is refused, and what it was allowed to do goes with it.
+  for (const a of dropSession(s.id)) broadcast({ type: 'approval.settled', id: a.id, sessionId: s.id, decision: 'no' });
   if (p?.sessionId === s.id) updateProject(p.id, { sessionId: listSessions(p.id)[0]?.id });
   return { ok: true };
 });
@@ -609,17 +612,126 @@ app.post('/api/projects/:id/memory', async (req, reply) => {
 
 /* Hooks from Claude Code */
 
+/**
+ * The gate.
+ *
+ * Claude Code holds the tool call until this answers, which is what makes an
+ * approval possible at all: while the reply is outstanding, nothing has run.
+ * So a rule the person could reasonably overrule is not refused here — it is
+ * put to them, and their answer is the reply. Say yes and the original command
+ * runs, first time, rather than Claude inventing a way around a refusal it was
+ * told about after the fact.
+ *
+ * Everything that happens is written into the transcript, allowed or refused,
+ * because a permission system nobody can audit afterwards is a permission
+ * system nobody should trust.
+ */
 app.post('/hooks/pretooluse', async (req, reply) => {
   if (req.headers['x-superbuilds-token'] !== TOKEN) return reply.code(401).send({});
-  const verdict = judge((req.body ?? {}) as never);
-  if (!verdict.allow) {
-    const body = req.body as { session_id?: string };
-    // Let the person see what was stopped, as a system line in the transcript.
-    const sid = String(body.session_id ?? '');
-    const s = sid ? getSession(sid) : undefined;
-    if (s) broadcast({ type: 'session.turn', sessionId: s.id, turn: { id: `deny-${Date.now()}`, role: 'system', text: `Refused: ${verdict.reason}`, at: Date.now() } });
+  const body = (req.body ?? {}) as { session_id?: string; tool_name?: string };
+  const verdict = judge(body as never);
+  if (verdict.allow) return hookResponse(verdict);
+
+  const session = body.session_id ? getSession(String(body.session_id)) : undefined;
+  const rule = verdict.rule!;
+  const note = (text: string) => {
+    if (!session) return;
+    const turn = { id: `policy-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, role: 'system' as const, text, at: Date.now() };
+    // Saved as well as sent: a refusal that disappears on reload is a refusal
+    // nobody can go back and check.
+    const fresh = getSession(session.id);
+    if (fresh) saveSession({ ...fresh, turns: [...fresh.turns, turn], updatedAt: turn.at });
+    broadcast({ type: 'session.turn', sessionId: session.id, turn });
+  };
+
+  // No answer would make these safe, so they are not put to anybody.
+  if (rule.risk === 'never') {
+    note(`Refused: ${rule.what.toLowerCase()}. ${rule.reason}`);
+    return hookResponse({ allow: false, reason: verdict.reason });
   }
-  return hookResponse(verdict);
+
+  // Already said yes to this, for this conversation.
+  if (session && granted(session.id, rule.id)) {
+    note(`Allowed, because you said yes to ${rule.scope ?? 'this'}: ${verdict.detail ?? rule.what}`);
+    return hookResponse({ allow: true });
+  }
+
+  // Nobody is watching, so nobody can answer. Refuse now rather than stalling
+  // an unattended build for two and a half minutes to reach the same place.
+  if (!session || clientCount() === 0) {
+    const why = session
+      ? 'Nobody has Super Builds open, so there was nobody to ask.'
+      : 'This is not running inside a Super Builds conversation, so there was nobody to ask.';
+    note(`Refused: ${rule.what.toLowerCase()}. ${why}`);
+    return hookResponse({ allow: false, reason: `${verdict.reason} ${why} Do it another way, or ask the person to allow it from the project screen.` });
+  }
+
+  let askId = '';
+  const decision = await askFor(
+    {
+      sessionId: session.id,
+      projectId: session.projectId,
+      tool: String(body.tool_name ?? 'a tool'),
+      ruleId: rule.id,
+      what: rule.what,
+      scope: rule.scope,
+      detail: verdict.detail ?? '',
+      danger: rule.danger,
+    },
+    (approval) => { askId = approval.id; broadcast({ type: 'approval.ask', approval }); },
+  );
+  // The route that took the answer has already said so. This covers the other
+  // way a question ends: nobody answered and it refused itself, which still has
+  // to take the card off the screen.
+  broadcast({ type: 'approval.settled', id: askId, sessionId: session.id, decision });
+
+  if (decision === 'no') {
+    note(`Refused: ${rule.what.toLowerCase()}.\n\n\`${verdict.detail ?? ''}\``);
+    return hookResponse({ allow: false, reason: `${verdict.reason} The person was asked and said no.` });
+  }
+  if (decision === 'session') {
+    broadcast({ type: 'approval.grants', sessionId: session.id, granted: grantsFor(session.id) });
+    note(`Allowed for the rest of this conversation — ${rule.scope ?? rule.what.toLowerCase()}.\n\n\`${verdict.detail ?? ''}\``);
+  } else {
+    note(`Allowed once — ${rule.what.toLowerCase()}.\n\n\`${verdict.detail ?? ''}\``);
+  }
+  return hookResponse({ allow: true });
+});
+
+/* What this conversation may do without asking again, and the answers to open questions. */
+
+app.get('/api/sessions/:id/access', async (req, reply) => {
+  const id = (req.params as { id: string }).id;
+  if (!getSession(id)) return reply.code(404).send({ error: 'no such session' });
+  return {
+    sessionId: id,
+    granted: grantsFor(id),
+    rules: RULES.filter((r) => r.risk === 'ask').map((r) => ({ id: r.id, what: r.what, scope: r.scope, danger: r.danger })),
+  };
+});
+
+app.post('/api/sessions/:id/access', async (req, reply) => {
+  const id = (req.params as { id: string }).id;
+  if (!getSession(id)) return reply.code(404).send({ error: 'no such session' });
+  const { ruleId, on } = (req.body ?? {}) as { ruleId?: string; on?: boolean };
+  const rule = RULES.find((r) => r.id === ruleId && r.risk === 'ask');
+  if (!rule) return reply.code(400).send({ error: 'That is not something that can be allowed.' });
+  const list = on ? grant(id, rule.id) : revoke(id, rule.id);
+  broadcast({ type: 'approval.grants', sessionId: id, granted: list });
+  return { sessionId: id, granted: list };
+});
+
+app.get('/api/approvals', async (req) => pendingFor((req.query as { session?: string })?.session));
+
+app.post('/api/approvals/:id', async (req, reply) => {
+  const id = (req.params as { id: string }).id;
+  const decision = String((req.body as { decision?: string })?.decision ?? '');
+  if (decision !== 'once' && decision !== 'session' && decision !== 'no') return reply.code(400).send({ error: 'once, session or no.' });
+  const approval = settleApproval(id, decision);
+  if (!approval) return reply.code(404).send({ error: 'That question has already been answered or has timed out.' });
+  broadcast({ type: 'approval.settled', id, sessionId: approval.sessionId, decision });
+  if (decision === 'session') broadcast({ type: 'approval.grants', sessionId: approval.sessionId, granted: grantsFor(approval.sessionId) });
+  return { ok: true, decision };
 });
 app.post('/hooks/notification', async (req, reply) => { if (req.headers['x-superbuilds-token'] !== TOKEN) return reply.code(401).send({}); return {}; });
 
@@ -663,6 +775,10 @@ wss.on('connection', (ws, req) => {
   send(ws, { type: 'hello', token: TOKEN });
   for (const p of listProjects()) send(ws, { type: 'project.upsert', project: p });
   for (const p of listProjects()) { const g = generationState(p.id); if (g) send(ws, { type: 'generation.update', state: g }); const pv = previewState(p.id); if (pv.running) send(ws, { type: 'preview.update', state: pv }); }
+  // A question already on the table survives a reload. Without this, refreshing
+  // the page while something waits for an answer loses the only control that
+  // could give one, and the build sits there until the question times out.
+  for (const approval of pendingFor()) send(ws, { type: 'approval.ask', approval });
   send(ws, { type: 'capacity.update', capacity: capacityNow() });
   ws.on('close', () => removeClient(ws));
   ws.on('error', () => removeClient(ws));

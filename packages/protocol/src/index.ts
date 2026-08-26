@@ -533,6 +533,50 @@ export interface SessionBoard {
   capacity: Capacity;
 }
 
+/* ---------------------------------------------------------------------------
+   Asking before touching the machine
+--------------------------------------------------------------------------- */
+
+/** Once, for the rest of this conversation, or not at all. */
+export type ApprovalDecision = 'once' | 'session' | 'no';
+
+/**
+ * A tool call held open while somebody decides.
+ *
+ * Everything a person needs to answer is on it, and the command is verbatim:
+ * a permission prompt that summarises what it is about to run is a prompt
+ * nobody can answer honestly.
+ */
+export interface Approval {
+  id: string;
+  sessionId: string;
+  projectId?: string;
+  /** Which tool asked — Bash, Write, Read. */
+  tool: string;
+  /** The rule in `policy.ts` that stopped it. A conversation-wide yes is keyed to this. */
+  ruleId: string;
+  /** What it wants to do, in words somebody who does not code can weigh. */
+  what: string;
+  /** What saying yes for the whole conversation would cover. */
+  scope?: string;
+  /** The command, or the path. Never summarised. */
+  detail: string;
+  /** Worth a red card rather than an ordinary one. */
+  danger?: boolean;
+  askedAt: number;
+  /** When it refuses itself, having had no answer. */
+  expiresAt: number;
+}
+
+/** What this conversation is allowed to do without asking again. */
+export interface MachineAccess {
+  sessionId: string;
+  /** Rule ids that have been said yes to. */
+  granted: string[];
+  /** Every rule that can be granted, and what each one means. */
+  rules: Array<{ id: string; what: string; scope?: string; danger?: boolean }>;
+}
+
 /** The notebook every conversation about a project reads. */
 export interface ProjectMemory {
   projectId: string;
@@ -771,6 +815,9 @@ export type ServerEvent =
   | { type: 'analytics.update'; state: AnalyticsState }
   | { type: 'capacity.update'; capacity: Capacity }
   | { type: 'memory.update'; memory: ProjectMemory }
+  | { type: 'approval.ask'; approval: Approval }
+  | { type: 'approval.settled'; id: string; sessionId: string; decision: ApprovalDecision }
+  | { type: 'approval.grants'; sessionId: string; granted: string[] }
   | { type: 'install.update'; message: string };
 
 /* ---------------------------------------------------------------------------

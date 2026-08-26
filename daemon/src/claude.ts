@@ -137,6 +137,12 @@ export function buildArgs(cfg: SpawnConfig, sessionId: string): string[] {
  * The settings file carrying our hooks. PreToolUse is the gate: the daemon
  * answers it over loopback with the per-boot token, and refuses the handful
  * of things a session must never do to the machine it is on.
+ *
+ * Its timeout is three minutes rather than one, and that number is load-bearing.
+ * The daemon may hold the reply open while it asks the person whether to allow
+ * something — see `approvals.ts`, which gives up after 150 seconds. A hook
+ * timeout under that would expire mid-question and decide it by itself, which
+ * is the one outcome a permission prompt must never have.
  */
 export function writeHookSettings(port: number, token: string): string {
   const dir = join(superbuildsHome(), 'hooks');
@@ -151,7 +157,7 @@ export function writeHookSettings(port: number, token: string): string {
   const on = (path: string, timeout?: number) => [{ matcher: '*', hooks: [hook(path, timeout)] }];
   writeFileSync(file, JSON.stringify({
     hooks: {
-      PreToolUse: on('pretooluse', 60),
+      PreToolUse: on('pretooluse', 180),
       Notification: on('notification'),
     },
   }, null, 2), { mode: 0o600 });

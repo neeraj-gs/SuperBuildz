@@ -102,5 +102,7 @@ export function needsToken(method: string, url: string): boolean {
   if (!url.startsWith('/api/')) return false;
   if (method !== 'GET' && method !== 'HEAD') return true;
   const path = url.split('?')[0];
-  return path.startsWith('/api/projects') || path.startsWith('/api/sessions') || path === '/api/capacity';
+  // `/api/approvals` carries the verbatim command a session wants to run, which
+  // is the person's work by any reading of it.
+  return path.startsWith('/api/projects') || path.startsWith('/api/sessions') || path.startsWith('/api/approvals') || path === '/api/capacity';
 }

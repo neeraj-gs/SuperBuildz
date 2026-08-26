@@ -6,6 +6,7 @@
 import type {
   Catalogue, Detection, InstallRecipeView, Plan, Project, Session, Spec, GenerationState, PreviewState, DeployState,
   ReferenceCapture, Choice, TweakState, Tweaks, Direction, FileEntry, FileBody, AdminLogin, AnalyticsState, EngineInfo, SiteSurvey, Understanding, Capacity, ProjectMemory, SessionBoard,
+  Approval, ApprovalDecision, MachineAccess,
 } from '@superbuilds/protocol';
 
 let token = '';
@@ -122,6 +123,12 @@ export const api = {
   change: (sid: string, kind: string, targets: string[], notes?: string) => post<{ ok: boolean }>(`/api/sessions/${sid}/change`, { kind, targets, notes }),
   stop: (sid: string) => post<{ how: string }>(`/api/sessions/${sid}/stop`),
   rewind: (sid: string, turnId: string) => post<{ ok: boolean; message: string }>(`/api/sessions/${sid}/rewind`, { turnId }),
+
+  /* What a conversation is allowed to do to the machine, and the questions it has open. */
+  access: (sid: string) => get<MachineAccess>(`/api/sessions/${sid}/access`),
+  setAccess: (sid: string, ruleId: string, on: boolean) => post<{ granted: string[] }>(`/api/sessions/${sid}/access`, { ruleId, on }),
+  approvals: (sid?: string) => get<Approval[]>(`/api/approvals${sid ? `?session=${sid}` : ''}`),
+  answer: (id: string, decision: ApprovalDecision) => post<{ ok: boolean }>(`/api/approvals/${id}`, { decision }),
 
   preview: (id: string) => get<PreviewState>(`/api/projects/${id}/preview`),
   startPreview: (id: string) => post<PreviewState>(`/api/projects/${id}/preview/start`),

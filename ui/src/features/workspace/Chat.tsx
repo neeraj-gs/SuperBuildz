@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 import { useStore, toast, ask } from '@/lib/store';
 import { Button, Markdown, Spinner, Textarea, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
+import { Approvals } from './Approvals';
 
 export function Chat({ session, projectId, busy }: { session: Session; projectId: string; busy: boolean }) {
   const streaming = useStore((s) => s.streaming);
@@ -85,6 +86,14 @@ export function Chat({ session, projectId, busy }: { session: Session; projectId
           <div className="flex justify-end mt-2"><Button size="sm" variant="primary" icon="arrowRight" onClick={runChange}>Do it</Button></div>
         </div>
       )}
+
+      {/*
+        Above the composer, below everything else: while one of these is on
+        screen the build is genuinely stopped, waiting on a press. It goes where
+        the person is already looking rather than at the end of a transcript
+        they would have to scroll to find.
+      */}
+      <Approvals sessionId={session.id} />
 
       {/* Input */}
       <div className="p-3 border-t border-line">

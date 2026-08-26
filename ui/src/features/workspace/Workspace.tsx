@@ -36,6 +36,7 @@ import { AdminBar } from './AdminBar';
 import { AnalyticsPanel } from './AnalyticsPanel';
 import { EnginePanel } from './EnginePanel';
 import { NotesPanel, SessionTabs } from './Sessions';
+import { AccessPanel } from './Approvals';
 
 /** The screens worth checking, and the width each one really is. */
 const DEVICES = [
@@ -72,6 +73,9 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
   const [engine, setEngine] = useState(false);
   const [openFile, setOpenFile] = useState<string | undefined>();
   const [notes, setNotes] = useState(false);
+  // Held as the conversation's id rather than a boolean: what may be done to
+  // the machine is granted per conversation, so the panel has to name which.
+  const [accessFor, setAccessFor] = useState<string | undefined>();
 
   const [reload, setReload] = useState(0);
   const [starting, setStarting] = useState(false);
@@ -220,6 +224,7 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
                     { label: 'Analytics and where to read it', icon: 'chart', onClick: () => setAnalytics(true) },
                     { label: 'Under the hood — the prompt and the rules', icon: 'cube', onClick: () => setEngine(true) },
                     { label: 'Shared notes every conversation reads', icon: 'book', onClick: () => setNotes(true) },
+                    { label: 'What it may do to the machine', icon: 'shield', onClick: () => setAccessFor(sessionId), disabled: !sessionId },
                     { label: 'Edit .env.local', icon: 'key', onClick: () => { setOpenFile('.env.local'); setView('files'); } },
                     { label: 'Rename', icon: 'edit', onClick: rename },
 
@@ -306,6 +311,7 @@ export function Workspace({ id, session: wanted }: { id: string; session?: strin
       {analytics && <AnalyticsPanel projectId={id} onClose={() => setAnalytics(false)} />}
       {engine && <EnginePanel projectId={id} onClose={() => setEngine(false)} />}
       {notes && <NotesPanel projectId={id} onClose={() => setNotes(false)} />}
+      {accessFor && <AccessPanel sessionId={accessFor} onClose={() => setAccessFor(undefined)} />}
     </div>
   );
 }

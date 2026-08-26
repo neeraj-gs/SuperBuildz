@@ -6,7 +6,7 @@
 
 import { create } from 'zustand';
 import type {
-  Detection, Project, Session, GenerationState, PreviewState, DeployState, ReferenceCapture, ServerEvent, Catalogue, Turn, ToolCall, TweakState, AnalyticsState, Capacity,
+  Detection, Project, Session, GenerationState, PreviewState, DeployState, ReferenceCapture, ServerEvent, Catalogue, Turn, ToolCall, TweakState, AnalyticsState, Capacity, Approval,
 } from '@superbuilds/protocol';
 import { api, setToken } from './api';
 
@@ -108,6 +108,17 @@ interface State {
   captures: Record<string, ReferenceCapture>;
   tweaks: Record<string, TweakState>;
   analytics: Record<string, AnalyticsState>;
+  /**
+   * Questions a conversation is waiting on, keyed by conversation.
+   *
+   * These are not notifications. The tool call is held open on the daemon while
+   * one of these is unanswered, so the build is genuinely stopped until
+   * somebody presses something — which is why the card that shows them is
+   * pinned above the composer rather than left to be scrolled to.
+   */
+  approvals: Record<string, Approval[]>;
+  /** Rule ids each conversation has already said yes to, keyed by conversation. */
+  access: Record<string, string[]>;
   capacity?: Capacity;
   toasts: Toast[];
   dialogs: Ask[];
@@ -141,6 +152,8 @@ export const useStore = create<State>((set, get) => ({
   captures: {},
   tweaks: {},
   analytics: {},
+  approvals: {},
+  access: {},
   toasts: [],
   dialogs: [],
 
@@ -203,6 +216,15 @@ export const useStore = create<State>((set, get) => ({
       case 'tweaks.update': set((s) => ({ tweaks: { ...s.tweaks, [ev.state.projectId]: ev.state } })); break;
       case 'analytics.update': set((s) => ({ analytics: { ...s.analytics, [ev.state.projectId]: ev.state } })); break;
       case 'capacity.update': set({ capacity: ev.capacity }); break;
+      case 'approval.ask': set((s) => {
+        const mine = s.approvals[ev.approval.sessionId] ?? [];
+        if (mine.some((a) => a.id === ev.approval.id)) return s;
+        return { approvals: { ...s.approvals, [ev.approval.sessionId]: [...mine, ev.approval] } };
+      }); break;
+      case 'approval.settled': set((s) => ({
+        approvals: { ...s.approvals, [ev.sessionId]: (s.approvals[ev.sessionId] ?? []).filter((a) => a.id !== ev.id) },
+      })); break;
+      case 'approval.grants': set((s) => ({ access: { ...s.access, [ev.sessionId]: ev.granted } })); break;
       case 'session.remove': set((s) => { const sessions = { ...s.sessions }; delete sessions[ev.sessionId]; return { sessions }; }); break;
       default: break;
     }
