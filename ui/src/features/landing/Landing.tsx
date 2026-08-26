@@ -37,7 +37,7 @@
  */
 
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { navigate, useStore } from '@/lib/store';
+import { useHost } from './host';
 import { Button, Logo, Count, Reveal, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { useChapter, type ChapterId } from './Spine';
@@ -46,17 +46,23 @@ import { Scenes } from './Scenes';
 import { Crm } from './Crm';
 import { Parallel } from './Parallel';
 import { Contact } from './Contact';
-import { Demo } from './Demo';
+import { Demo, playDemo } from './Demo';
 import { Faq } from './Faq';
+import { Download } from './Download';
 
 const Spine = lazy(() => import('./Spine').then((m) => ({ default: m.Spine })));
 
 const PROVIDERS = ['Vercel', 'Netlify', 'PostHog', 'GA4', 'Plausible', 'Amplitude', 'Mixpanel', 'Umami', 'Fathom', 'Simple', 'Cloudflare', 'the built-in one'];
 
 export function Landing() {
-  const detection = useStore((s) => s.detection);
-  const ready = detection?.ok;
-  const go = () => navigate(ready ? { name: 'new' } : { name: 'setup' });
+  /*
+    Every control that would take somebody into the tool comes from the host,
+    and the public one simply does not supply them. Removed rather than
+    disabled: a greyed-out button on a page where the product does not exist is
+    an invitation to wonder what is wrong with your browser.
+  */
+  const host = useHost();
+  const go = host.start;
 
   return (
     <div className="relative">
@@ -93,12 +99,10 @@ export function Landing() {
                 and publishes it in one press.
               </p>
               <div className="flex flex-wrap items-center gap-3 mt-8 rise s4">
-                <Button variant="primary" size="lg" iconRight="arrowRight" onClick={go}>
-                  {ready ? 'Build a site' : 'Start — check requirements'}
-                </Button>
-                <Button variant="ghost" size="lg" icon="refresh" onClick={() => navigate({ name: 'revamp' })}>
-                  Revamp one you have
-                </Button>
+                <Button variant="primary" size="lg" iconRight="arrowRight" onClick={go}>{host.startLabel}</Button>
+                {host.revamp
+                  ? <Button variant="ghost" size="lg" icon="refresh" onClick={host.revamp}>Revamp one you have</Button>
+                  : <Button variant="ghost" size="lg" icon="play" onClick={playDemo}>Watch a full run</Button>}
               </div>
               <div className="flex flex-wrap gap-x-5 gap-y-2 mt-9 rise s5">
                 {['No account', 'No token held', 'Nothing leaves this machine'].map((t) => (
@@ -130,6 +134,14 @@ export function Landing() {
           not claim a movement of the object behind the page, so the scene holds
           whatever the hero left it on while you watch.
         */}
+        {/*
+          Public only, and directly under the hero. It is the whole reason
+          somebody is on the page rather than in the app, and it carries the
+          answer to the question its own bad news provokes — what does it
+          actually do — as a row of the same weight.
+        */}
+        {host.mode === 'public' && <Download />}
+
         <Demo />
 
         {/* --------------------------------------------------- Four presses -- */}
@@ -293,8 +305,8 @@ export function Landing() {
                 folder you own, and you can point it at a site you already have instead.
               </p>
               <div className="mt-7 flex flex-wrap gap-3">
-                <Button variant="primary" size="lg" iconRight="arrowRight" onClick={go}>Start</Button>
-                <Button variant="ghost" size="lg" onClick={() => navigate({ name: 'setup' })}>Check requirements</Button>
+                <Button variant="primary" size="lg" iconRight="arrowRight" onClick={go}>{host.startLabel}</Button>
+                {host.requirements && <Button variant="ghost" size="lg" onClick={host.requirements}>Check requirements</Button>}
               </div>
             </div>
             <ul className="grid gap-2">
@@ -325,7 +337,7 @@ export function Landing() {
         {/* ------------------------------------------------------------ FAQ -- */}
         <Faq />
 
-        <Footer onStart={go} ready={ready} />
+        <Footer onStart={go} ready={host.ready} />
       </div>
     </div>
   );
@@ -354,20 +366,23 @@ export function Landing() {
  * to read.
  */
 function Footer({ onStart, ready }: { onStart: () => void; ready?: boolean }) {
+  const host = useHost();
   const COLUMNS: Array<{ title: string; links: Array<{ label: string; onClick?: () => void; href?: string }> }> = [
-    {
-      title: 'Build',
-      links: [
-        { label: ready ? 'A new site' : 'Start — check requirements', onClick: onStart },
-        { label: 'Revamp one you have', onClick: () => navigate({ name: 'revamp' }) },
-        { label: 'Your projects', onClick: () => navigate({ name: 'projects' }) },
-        { label: 'Every conversation', onClick: () => navigate({ name: 'sessions' }) },
-        { label: 'What this machine needs', onClick: () => navigate({ name: 'setup' }) },
-      ],
-    },
+    // On the public page `doors` is empty and the whole column goes with it,
+    // rather than standing there with nothing under its heading.
+    ...(host.doors.length
+      ? [{
+        title: 'Build',
+        links: [
+          { label: ready ? 'A new site' : 'Start — check requirements', onClick: onStart },
+          ...host.doors,
+        ],
+      }]
+      : []),
     {
       title: 'This page',
       links: [
+        ...(host.mode === 'public' ? [{ label: 'Get the app', href: '#get' }] : []),
         { label: 'Watch a full run', href: '#demo' },
         { label: 'How you get it', href: '#contact' },
         { label: 'Questions', href: '#faq' },
@@ -391,7 +406,10 @@ function Footer({ onStart, ready }: { onStart: () => void; ready?: boolean }) {
 
   return (
     <footer className="border-t border-line bg-ink/80 backdrop-blur-sm">
-      <div className="shell-wide py-12 md:py-14 grid gap-10 md:gap-8 md:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
+      {/* Written out rather than composed, because Tailwind only ships classes
+          it can see as literals in the source. Two columns on the public page,
+          three inside the app. */}
+      <div className={cx('shell-wide py-12 md:py-14 grid gap-10 md:gap-8', COLUMNS.length === 2 ? 'md:grid-cols-[minmax(0,1.4fr)_repeat(2,minmax(0,1fr))]' : 'md:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]')}>
         <div className="min-w-0">
           <Logo />
           <p className="text-[13px] leading-relaxed text-bone-3 mt-4 max-w-[34ch]">

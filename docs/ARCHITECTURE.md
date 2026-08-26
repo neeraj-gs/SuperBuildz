@@ -541,6 +541,65 @@ which is not an uninterested reader, it is one who reached the bottom looking
 for something they did not find on the way. So it is three columns of doors:
 everything in the product, everything on this page, and every way to reach me.
 
+### The public build (`site/`)
+
+The landing page is now two things: the tool's own front door, and a page on
+the internet. Those want different things from the same sections. Inside the
+app, "Build a site" starts a build and the footer is a list of doors into the
+product. On the deployed page there is no product to open — the visitor has not
+got it yet — so the same press has to mean *get the app*, and every one of those
+doors would be a link to a screen that does not exist.
+
+**"The app with the buttons hidden" is not a thing that can ship.** The app's
+bundle carries the wizard, the workspace, the file editor, the daemon client and
+a websocket that would spend its life failing to reach a machine that is not
+there. Hiding the controls leaves every one of those screens a URL away and the
+socket still dials.
+
+So the actions are injected — `ui/src/features/landing/host.tsx`. The public
+host supplies `start` and nothing else; `revamp`, `requirements` and `doors` are
+*absent*, so those controls are not rendered, not in the bundle, and not
+reachable by Tab. Hidden navigation is still navigation.
+
+The measurement is the point: the app's landing bundle is ~396KB and contains
+the store, the API client and the socket. The public one is ~95KB and greps
+clean for `WebSocket`, `zustand` and `/api/`. Getting there needed one more
+change — `Toasts` moved out of `components/ui.tsx`, because it was the single
+thing in that module reading the store, and one import of `Button` therefore
+dragged the whole daemon client onto a marketing page. `ui.tsx` imports nothing
+from `lib/` now, and that is the rule that keeps this true.
+
+No copy of the landing page exists in `site/`. It imports the same files, and a
+`site/package.json` with no dependencies of its own, so nothing resolves a
+second React.
+
+**Two things this cost, both worth knowing.** Tailwind v4 infers what to scan
+from the Vite root, which is right for `ui/` and wrong for `site/` — the first
+build came out with type and colour and no layout at all. `@source` directives
+in `global.css`, relative to the stylesheet, fix it for both. And the hero's
+`clamp()` floor was fixed at 40px however narrow the screen: "Ship something" in
+Syne 800 at 40px is 324px wide against 288px of column on a 320px phone. That is
+what had been pushing the landing page sideways below 348px all along — long
+blamed on a mock panel much further down the page. `min()` inside the floor lets
+it keep shrinking under 400px, and every route is now clean from 320.
+
+### Getting the app (`ui/src/features/landing/Download.tsx`)
+
+Three platforms and no download links, which is the honest shape of the moment:
+the builds exist and work; what does not exist is a signed, publicly fetchable
+installer, which is a certificate and a release pipeline rather than a program.
+A page with no download row reads as unfinished, and one with a dead link reads
+as broken — and the second is the one people tell other people about. So the row
+is real, names the file each platform actually gets, and pressing one says the
+true thing in the first sentence with two working ways out under it: ask and get
+a build today, or leave an address for the public one.
+
+It marks the visitor's own platform rather than filtering to it, so a wrong
+guess costs a highlight in the wrong place and never a build somebody cannot
+reach. Phones deliberately match nothing: this runs a build on your own machine,
+and telling somebody on an iPhone their platform is macOS would be a lie with a
+button under it. `platform.ts`, tested.
+
 ## 6c. Ports, and the day one literal broke the product three ways
 
 Worth writing down because the failure was so much larger than the cause, and

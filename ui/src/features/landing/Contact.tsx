@@ -166,21 +166,28 @@ export function Contact() {
  * The wrapper is the caller's: on the page it is a panel in a column, in the
  * modal it is the modal. What is here is only ever the contents.
  */
-export function ContactCard() {
+export function ContactCard({ compact, subject }: { compact?: boolean; subject?: string } = {}) {
+  // Inside the download panel the reason for writing has already been said, and
+  // saying it twice is what makes a modal feel like a leaflet.
+  const to = subject ? `mailto:${EMAIL}?subject=${encodeURIComponent(subject)}` : MAILTO;
   return (
     <>
-      <h3 className="legend">Who made it</h3>
-      <p className="d3 mt-2.5">Neeraj GS</p>
-      <p className="text-[13.5px] leading-relaxed text-bone-2 mt-3">
-        I built Super Builds. It runs on your machine, drives the command line tools you already
-        installed, and never holds a key for anybody — mine included.
-      </p>
+      <h3 className="legend">{compact ? 'Where to reach me' : 'Who made it'}</h3>
+      {!compact && (
+        <>
+          <p className="d3 mt-2.5">Neeraj GS</p>
+          <p className="text-[13.5px] leading-relaxed text-bone-2 mt-3">
+            I built Super Builds. It runs on your machine, drives the command line tools you already
+            installed, and never holds a key for anybody — mine included.
+          </p>
 
-      <div className="mt-5">
-        <Button variant="primary" icon="mail" onClick={() => { window.location.href = MAILTO; }}>
-          Email me
-        </Button>
-      </div>
+          <div className="mt-5">
+            <Button variant="primary" icon="mail" onClick={() => { window.location.href = to; }}>
+              Email me
+            </Button>
+          </div>
+        </>
+      )}
 
       {/*
         Rows rather than a row of icons: there is no recognisable glyph for a
@@ -189,7 +196,7 @@ export function ContactCard() {
         and the email row carries a copy, because a mailto on a machine with no
         mail client set up opens nothing at all and looks broken.
       */}
-      <ul className="mt-5 border-t border-line">
+      <ul className={cx('border-t border-line', compact ? 'mt-3' : 'mt-5')}>
         {ELSEWHERE.map((l) => (
           <li key={l.label} className="flex items-center gap-2 border-b border-line">
             <a
@@ -213,10 +220,12 @@ export function ContactCard() {
         ))}
       </ul>
 
-      <p className="text-[12.5px] leading-relaxed text-bone-4 mt-5">
-        Ask for a build, ask a question, or tell me what is missing. If something in here is wrong
-        or slow or ugly, that is the email I most want.
-      </p>
+      {!compact && (
+        <p className="text-[12.5px] leading-relaxed text-bone-4 mt-5">
+          Ask for a build, ask a question, or tell me what is missing. If something in here is wrong
+          or slow or ugly, that is the email I most want.
+        </p>
+      )}
     </>
   );
 }

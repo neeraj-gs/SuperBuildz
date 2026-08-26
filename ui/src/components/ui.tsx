@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import { Icon } from './icons';
-import { useStore } from '@/lib/store';
 
 export const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ');
 
@@ -86,22 +85,6 @@ export function Logo({ size = 20, wordmark = true, from = 'xs' }: { size?: numbe
 export function Dot({ on, tone = 'volt', className }: { on?: boolean; tone?: 'volt' | 'danger' | 'warn'; className?: string }) {
   const c = on ? (tone === 'danger' ? 'bg-danger' : tone === 'warn' ? 'bg-warn' : 'bg-volt') : 'bg-bone-4';
   return <span className={cx('inline-block w-[6px] h-[6px] rounded-full shrink-0', c, className)} />;
-}
-
-export function Toasts() {
-  const toasts = useStore((s) => s.toasts);
-  const dismiss = useStore((s) => s.dismissToast);
-  return (
-    <div className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 w-[min(380px,calc(100vw-40px))]">
-      {toasts.map((t) => (
-        <div key={t.id} className={cx('panel rise px-3.5 py-3 text-[13px] flex items-start gap-2.5 shadow-2xl shadow-black/60', t.kind === 'error' && 'border-danger/40', t.kind === 'ok' && 'border-volt-3')}>
-          <Icon name={t.kind === 'error' ? 'alert' : t.kind === 'ok' ? 'check' : 'sparkle'} size={15} className={cx('mt-px shrink-0', t.kind === 'error' ? 'text-danger' : 'text-volt')} />
-          <span className="flex-1 text-bone-2 leading-relaxed">{t.text}</span>
-          <button onClick={() => dismiss(t.id)} className="text-bone-4 hover:text-bone shrink-0"><Icon name="x" size={13} /></button>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 /** A number that counts up to its value when it first appears. */

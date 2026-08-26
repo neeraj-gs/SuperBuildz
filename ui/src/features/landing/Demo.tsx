@@ -28,22 +28,34 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { navigate, useStore } from '@/lib/store';
+import { useHost } from './host';
 import { Button, cx } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { embedFor } from './embed';
 
 /**
- * The walkthrough.
+ * The walkthrough. This is the only place the video is named.
  *
- * `url` empty means the section shows its "being recorded" state. Chapters are
- * optional and drawn only when there are some; they are a list of times a
- * person can press, not decoration, so an invented one would be worse than
- * none.
+ * Two ways to set it, and the second is the one to reach for when deploying:
+ *
+ *   `VITE_DEMO_URL`   an environment variable read at build time. Set it once
+ *                     in the host's settings and the deployed page has the
+ *                     video without anybody editing a file or making a commit.
+ *   `url` below       the fallback, for a link that should live in the repo.
+ *
+ * A Loom share link, a Google Drive share link, a YouTube link or a direct
+ * `.mp4` all work — `embedFor` recognises which and rewrites it to whatever
+ * that host calls its embed. Empty means the section shows its "being
+ * recorded" state, which is a real state rather than a hole.
+ *
+ * `length` is what the row on the download block says, so it should be the
+ * real running time or nothing. Chapters are optional and drawn only when
+ * there are some; they are times a person can press, not decoration, so an
+ * invented one would be worse than none.
  */
-const DEMO: { url: string; length?: string; chapters: Array<{ at: string; label: string }> } = {
-  url: '',
-  length: undefined,
+export const DEMO: { url: string; length?: string; chapters: Array<{ at: string; label: string }> } = {
+  url: import.meta.env.VITE_DEMO_URL ?? '',
+  length: import.meta.env.VITE_DEMO_LENGTH ?? undefined,
   chapters: [],
 };
 
@@ -52,14 +64,16 @@ const DEMO: { url: string; length?: string; chapters: Array<{ at: string; label:
 let wanted = false;
 const listeners = new Set<() => void>();
 
-/** From the header. Goes to the demo, wherever you were, and starts it. */
+/**
+ * Goes to the demo and starts it.
+ *
+ * `wanted` is set before the listeners are called and cleared by whoever takes
+ * it, so a press that arrives before the section is mounted — the public page
+ * still hydrating, the app's landing route still switching — is answered when
+ * it mounts rather than dropped.
+ */
 export function playDemo() {
   wanted = true;
-  if (useStore.getState().route.name !== 'landing') {
-    // The section is not mounted yet; it will read `wanted` when it is.
-    navigate({ name: 'landing' });
-    return;
-  }
   for (const fn of listeners) fn();
 }
 
@@ -72,8 +86,8 @@ function takeRequest(): boolean {
 /* -------------------------------------------------------------- section -- */
 
 export function Demo() {
-  const detection = useStore((s) => s.detection);
-  const go = () => navigate(detection?.ok ? { name: 'new' } : { name: 'setup' });
+  const host = useHost();
+  const go = host.start;
 
   const [playing, setPlaying] = useState(false);
   const section = useRef<HTMLElement>(null);
@@ -124,7 +138,7 @@ export function Demo() {
             )}
 
             <div className="flex flex-wrap gap-3 mt-7">
-              <Button variant="primary" iconRight="arrowRight" onClick={go}>Build one yourself</Button>
+              <Button variant="primary" iconRight="arrowRight" onClick={go}>{host.mode === 'app' ? 'Build one yourself' : host.startLabel}</Button>
               <a className="btn btn-ghost" href="#contact">Ask for a build</a>
             </div>
           </div>
@@ -208,7 +222,7 @@ function Placeholder({ onGo }: { onGo: () => void }) {
           does is to run one — it asks four questions before it spends anything.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2.5 mt-5">
-          <Button size="sm" variant="primary" iconRight="arrowRight" onClick={onGo}>Start a build</Button>
+          <Button size="sm" variant="primary" iconRight="arrowRight" onClick={onGo}>See how to get it</Button>
           <a className="btn btn-quiet btn-sm" href="#contact">Tell me when it is up</a>
         </div>
       </div>

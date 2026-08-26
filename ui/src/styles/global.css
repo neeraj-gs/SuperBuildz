@@ -1,6 +1,22 @@
 @import "tailwindcss";
 
 /*
+  Where the class names are, stated rather than inferred.
+
+  Tailwind v4 works out what to scan from the Vite root, which is correct for
+  `ui/` and wrong for `site/` — the public build's root is a folder up, so it
+  found the classes in `site/src/main.tsx` and none of the ones in the landing
+  page itself. The page came out with its type and colour and none of its
+  layout: every section collapsed on top of the next, which is what a stylesheet
+  missing three hundred utilities looks like.
+
+  These are relative to this file, so both builds resolve the same folders and
+  neither depends on where it was started from.
+*/
+@source "../";
+@source "../../../design-library";
+
+/*
   Super Builds — the design system of the tool itself.
 
   Three voices, each with one job:
@@ -59,8 +75,19 @@
   --sb-ease: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Type scale — fluid but capped. d1 is the landing hero and nothing else. */
-  --t-d1: clamp(2.5rem, 5vw, 4.5rem);      /* 40 → 72 */
-  --t-d2: clamp(1.625rem, 2.6vw, 2.375rem);/* 26 → 38 */
+  /*
+    The floors are viewport-relative below ~400px, and that is the whole
+    reason the page fits a small phone.
+
+    A plain `clamp(2.5rem, 5vw, 4.5rem)` stops shrinking at 40px however narrow
+    the screen gets, and "Ship something" set in Syne 800 at 40px is 324px wide
+    — against 288px of column on a 320px screen. The hero pushed the entire
+    page sideways, which for a long time was blamed on a mock panel further
+    down. `min()` inside the floor lets it keep going: it only bites below
+    400px, where the alternative is a horizontal scrollbar on the landing page.
+  */
+  --t-d1: clamp(min(2.5rem, 10vw), 5vw, 4.5rem);      /* 40 → 72, and smaller than 40 under 400 */
+  --t-d2: clamp(min(1.625rem, 6.8vw), 2.6vw, 2.375rem);/* 26 → 38 */
   --t-d3: clamp(1.375rem, 2vw, 1.875rem);  /* 22 → 30 — page titles in the tool */
   --t-d4: 1.25rem;                          /* 20 — card and panel headings */
   --t-body: 0.9375rem;                      /* 15 */

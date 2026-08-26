@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore, connect, navigate } from '@/lib/store';
-import { Toasts, Logo, Button, Dot, cx } from '@/components/ui';
+import { Logo, Button, Dot, cx } from '@/components/ui';
+import { Toasts } from '@/components/Toasts';
 import { Icon } from '@/components/icons';
 import { Dialogs } from '@/components/Dialog';
 import { Connection } from '@/components/Connection';
@@ -13,6 +14,7 @@ import { Revamp } from '@/features/revamp/Revamp';
 import { Board } from '@/features/board/Board';
 import { ContactModal } from '@/features/landing/Contact';
 import { playDemo } from '@/features/landing/Demo';
+import { LandingHostProvider } from '@/features/landing/host';
 
 /**
  * One shell, one header. The header is defined here and nowhere else — an
@@ -45,7 +47,31 @@ export function App() {
     <div className="min-h-full flex flex-col">
       <TopBar overlay={overlay} onContact={() => setContact(true)} />
       <main className={cx('flex-1', overlay ? '' : 'pb-24')}>
-        {route.name === 'landing' && <Landing />}
+        {/*
+          Inside the app, every control on the landing page is a door into the
+          product. On the deployed page there is no product to open, so the
+          public host supplies none of them — see `features/landing/host.tsx`.
+        */}
+        {route.name === 'landing' && (
+          <LandingHostProvider
+            host={{
+              mode: 'app',
+              ready: !!detection?.ok,
+              startLabel: detection?.ok ? 'Build a site' : 'Start — check requirements',
+              start: () => navigate(detection?.ok ? { name: 'new' } : { name: 'setup' }),
+              revamp: () => navigate({ name: 'revamp' }),
+              requirements: () => navigate({ name: 'setup' }),
+              doors: [
+                { label: 'Revamp one you have', onClick: () => navigate({ name: 'revamp' }) },
+                { label: 'Your projects', onClick: () => navigate({ name: 'projects' }) },
+                { label: 'Every conversation', onClick: () => navigate({ name: 'sessions' }) },
+                { label: 'What this machine needs', onClick: () => navigate({ name: 'setup' }) },
+              ],
+            }}
+          >
+            <Landing />
+          </LandingHostProvider>
+        )}
         {route.name === 'setup' && <Setup />}
         {route.name === 'projects' && <Dashboard />}
         {route.name === 'new' && <Wizard />}

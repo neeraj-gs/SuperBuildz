@@ -1,0 +1,13 @@
+{
+  "name": "@superbuilds/site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "//": "No dependencies of its own on purpose: everything it needs is already a dependency of @superbuilds/ui and hoists to the workspace root. A second copy of React in the tree is the fastest way to a page that renders twice.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

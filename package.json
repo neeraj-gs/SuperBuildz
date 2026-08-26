@@ -7,7 +7,8 @@
   "workspaces": [
     "packages/*",
     "daemon",
-    "ui"
+    "ui",
+    "site"
   ],
   "engines": {
     "node": ">=22"
@@ -18,7 +19,9 @@
     "dev:daemon": "node daemon/src/index.ts",
     "dev:ui": "npm --prefix ui run dev",
     "build": "npm --prefix ui run build",
-    "typecheck": "npm --prefix daemon run typecheck && npm --prefix ui run typecheck",
+    "build:site": "npm --prefix site run build",
+    "dev:site": "npm --prefix site run dev",
+    "typecheck": "npm --prefix daemon run typecheck && npm --prefix ui run typecheck && npm --prefix site run typecheck",
     "test": "node daemon/test/run.mjs",
     "template:install": "npm --prefix templates/site install",
     "shot": "node scripts/shot.mjs"
